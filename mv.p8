@@ -26,6 +26,7 @@ player =
 		this.p_input=0
 		this.hitbox={x=2, y=1, w=5, h=7}
 		this.spd = {x=2,y=0}
+		this.dir={x=0, y=0}
 		this.p_jump = false
 		this.doublejump=false
 		this.is_jumping=false
@@ -36,6 +37,8 @@ player =
 		this.anim_timer=0
 		this.dash_timer=0
 
+		w=init_obj(weapon, this.x, this.y)
+		del(objects, w)
 	end,
 	update=function(this)
 		local input = btn(k_right) and 1 or (btn(k_left) and -1 or 0)
@@ -102,14 +105,15 @@ player =
 
 		-- move
 		this.move(this.spd.x, this.spd.y)
+
+		this.dir.x=0 this.dir.y=0
+		if btn(k_down) then this.dir.y=1 elseif btn(k_up) then this.dir.y=-1 end
+		this.dir.x=input
 		
 		-- animation --
 		---------------
 
-		if wall_touching then
-			this.flip.x=not(input==1)
-		elseif input==1 then this.flip.x=false
-		elseif input==-1 then this.flip.x=true end
+		if input!=0 then this.flip.x = input==-1 end
 
 		if wall_touching and not this.is_standing then
 			this.spr=5
@@ -123,11 +127,14 @@ player =
 			this.spr=1
 			this.anim_timer=0
 		end
-		this.anim_timer += 0.25		
+		this.anim_timer += 0.25
+
+		w.type.update(w)
 
 	end,
 	draw=function(this)
 		spr(this.spr,this.x,this.y,1,1, this.flip.x, this.flip.y)
+		w.type.draw(w)
 	end
 }
 
@@ -143,7 +150,7 @@ weapon =
 		this.p_inputx=0
 		this.p_shoot=false
 		this.p_change=false
-		this.w_type=shot
+		this.w_type=bullet
 	end,
 
 	update=function(this)
@@ -219,7 +226,7 @@ weapon =
 
 		-- shoot --
 		-----------
-			if change then if this.w_type==shot then this.w_type=ray else this.w_type=shot end end
+			if change then if this.w_type==bullet then this.w_type=ray else this.w_type=bullet end end
 			if shoot then init_obj(this.w_type, this.x, this.y, this.dir.x*10, this.dir.y*10) end
 
 		-----------
@@ -235,7 +242,7 @@ weapon =
 }
 
 -- one of the weapon shots
-shot={
+bullet={
 	init=function(this)
 		this.spr=18
 		this.hitbox={x=2, y=3, w=3, h=3}
@@ -267,23 +274,36 @@ shot={
 ray={
 	init=function(this)
 		this.hitbox={x=0, y=0, w=16, h=3}
+		this.length=16
 		shake=true
 	end,
 
 	update=function(this)
-		
-		if w.dir.y==1 then this.x=w.x+2 this.y=w.y+13 elseif w.dir.y==-1 then this.x=w.x+2 this.y=w.y-8 elseif
-			w.dir.x==1 then this.x=w.x+12 this.y=w.y+3 elseif w.dir.x==-1 then this.x=w.x-8 this.y=w.y+3 end
+		if w.dir.y==1 then 
+			this.x=w.x+2 this.y=w.y+13
+			this.hitbox.w=3 this.hitbox.h=this.length
+		elseif w.dir.y==-1 then 
+			this.x=w.x+2 this.y=w.y-5
+			this.hitbox.w=3 this.hitbox.h=-this.length
+		elseif w.dir.x==1 then 
+			this.x=w.x+12 this.y=w.y+3
+			this.hitbox.w=this.length this.hitbox.h=3
+		elseif w.dir.x==-1 then 
+			this.x=w.x-5 this.y=w.y+3
+			this.hitbox.w=-this.length this.hitbox.h=3
+		end
 
 		if not btn(k_shoot) then shake = false del(objects, this) end
 	end,
 
 	draw=function(this)
-		for i=0, 16, 3 do
-			local y=this.y+i*w.dir.y+rnd(2)
-			local y_off=this.y+i*w.dir.y+rnd(4)
-			local x_off=this.x+i*w.dir.x+rnd(4)
-			local x=this.x+i*w.dir.x+rnd(2)
+		for i=0, 16, 4 do
+			local y=clamp(this.y+i*w.dir.y+rnd(2), this.y, this.y+this.hitbox.h)
+			local y_off=clamp(this.y+i*w.dir.y+rnd(4), this.y, this.y+this.hitbox.h)
+			local x_off=clamp(this.x+i*w.dir.x+rnd(4), this.x, this.x+this.hitbox.w)
+			local x=clamp(this.x+i*w.dir.x+rnd(2), this.x, this.x+this.hitbox.w)
+			
+			rectfill(this.x, this.y, this.x+this.hitbox.w, this.y+this.hitbox.h, 8)
 			rectfill(x, y, x_off, y_off, 8)
 			rect(x, y, x_off, y_off, 7)
 		end
@@ -300,7 +320,8 @@ door={
 
 	update=function(this)
 
-		if this.check_collision_actor(shot, 2, 0) then this.open=true end
+		if this.check_overlap_actor(bullet, 2, 0) or this.check_overlap_actor(ray, 2, 0) or
+		this.check_overlap_actor(bullet, -4, 0) or this.check_overlap_actor(ray, -4, 0) then this.open=true end
 
 		if this.open and this.spr~=38 then this.anim_timer+=0.25 this.spr=36+this.anim_timer%3 end
 		if this.spr==38 then this.rigid=false end
@@ -326,7 +347,7 @@ function init_obj(type, x, y, spdx, spdy)
 	obj.flip={x=false, y=false}
 	obj.spr=0
 
-	if type~=nil and (type==shot or type==ray) then
+	if type~=nil and (type==bullet or type==ray) then
 		obj.spd.x=spdx
 		obj.spd.y=spdy
 	end
@@ -335,9 +356,9 @@ function init_obj(type, x, y, spdx, spdy)
 		return solid_at(obj.x+obj.hitbox.x+ox, obj.y+obj.hitbox.y+oy, obj.hitbox.w, obj.hitbox.h) or obj.check_collision(ox, oy)
 	end
 
-	obj.collide_actor=function(ox, oy)
+	obj.overlap_actor=function(ox, oy)
 		for other in all(objects) do
-			if other~=nil and other.rigid and other!=obj and
+			if other~=nil and other!=obj and
 				other.x+other.hitbox.x+other.hitbox.w > obj.x+obj.hitbox.x+ox and
 				other.y+other.hitbox.y+other.hitbox.h > obj.y+obj.hitbox.y+oy and
 				other.x+other.hitbox.x < obj.x+obj.hitbox.x+obj.hitbox.w+ox and
@@ -350,12 +371,12 @@ function init_obj(type, x, y, spdx, spdy)
 	end
 
 	obj.check_collision=function(ox, oy)
-		local collided = obj.collide_actor(ox, oy)
-		return collided~=nil and collided.type!=weapon and collided.type!=shot and collided.type!=player
+		local collided = obj.overlap_actor(ox, oy)
+		return collided~=nil and collided.rigid and not ignored_collision(collided)
 	end
 
-	obj.check_collision_actor=function(type, ox, oy)
-		local collided = obj.collide_actor(ox, oy)
+	obj.check_overlap_actor=function(type, ox, oy)
+		local collided = obj.overlap_actor(ox, oy)
 		return collided~=nil and collided.type==type
 	end
 
@@ -390,6 +411,11 @@ function init_obj(type, x, y, spdx, spdy)
 		obj.type.init(obj)
 	end
 	return obj
+end
+
+-- list of actors to be ignored when colliding
+function ignored_collision(obj)
+	return obj.type==weapon or obj.type==bullet or obj.type==ray or obj.type==player
 end
 
 -- movement functions (returns if has collided or not)
@@ -469,7 +495,11 @@ end
 ----------------------
 
 function clamp(val,a,b)
-	return max(a, min(b, val))
+	if b>a then 
+		return max(a, min(b, val))
+	else
+		return max(b, min(a, val))
+	end
 end
 
 function appr(val, target, amount)
@@ -515,9 +545,8 @@ p=nil
 d=nil
 w=nil
 function _init()
-	d=init_obj(door, 64*8, 60*8)
-	p=init_obj(player, 65*8, 100)
-	w=init_obj(weapon, p.x, p.y)
+	d=init_obj(door, 64*8+50, 60*8)
+	p=init_obj(player, 65*8, 59*8)
 end
 
 function _update()
