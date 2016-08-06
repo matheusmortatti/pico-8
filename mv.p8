@@ -8,6 +8,7 @@ __lua__
 ----------------------
 
 objects = {}	-- all the objects active in the game
+shake=false		-- camera shake
 
 k_left=0
 k_right=1
@@ -15,6 +16,7 @@ k_up=2
 k_down=3
 k_jump=4
 k_shoot=5
+k_change=4
 
 player = 
 {
@@ -34,7 +36,6 @@ player =
 		this.anim_timer=0
 		this.dash_timer=0
 
-		init_obj(weapon, this.x, this.y)
 	end,
 	update=function(this)
 		local input = btn(k_right) and 1 or (btn(k_left) and -1 or 0)
@@ -42,13 +43,12 @@ player =
 		local jump = btn(k_jump) and not this.p_jump
 		this.p_jump = btn(k_jump)
 
-		
+
 		-- if the player is touching the walls
 		local wall_touching=solid_at(this.x+this.hitbox.x+input, this.y+this.hitbox.y, this.hitbox.w, this.hitbox.h)
 		-- if the player is standing
 		this.is_standing = solid_at(this.x+this.hitbox.x, this.y+this.hitbox.y+1, this.hitbox.w, this.hitbox.h)
 
-		--if this.wall_touch and this.wjbuffer==0 then this.wallside=input end
 
 		-- movement --
 		--------------
@@ -123,8 +123,7 @@ player =
 			this.spr=1
 			this.anim_timer=0
 		end
-		this.anim_timer += 0.25
-
+		this.anim_timer += 0.25		
 
 	end,
 	draw=function(this)
@@ -140,19 +139,25 @@ weapon =
 		this.spr=16
 		this.x=0
 		this.y=0
+		this.dir={x=0, y=0}
 		this.p_inputx=0
 		this.p_shoot=false
+		this.p_change=false
+		this.w_type=shot
 	end,
 
 	update=function(this)
 		local inputx=btn(k_right) and 1 or (btn(k_left) and -1)
 		local shoot=btn(k_shoot) and not this.p_shoot
 		this.p_shoot=btn(k_shoot)
+		local change=btn(k_change, 1) and not this.p_change
+		this.p_change=btn(k_change, 1)
 		local inputy=btn(k_down) and 1 or (btn(k_up) and -1 or 0)
 		this.p_inputx=inputx or this.p_inputx
 		
-		local dirx = 0
-		local diry = 0
+
+		this.dir.x = 0
+		this.dir.y = 0
 
 		if inputy==1 then
 			this.spr_offx=0
@@ -161,7 +166,7 @@ weapon =
 			this.flip.y=true
 			this.spr=17
 
-			diry=1
+			this.dir.y=1
 			
 		elseif inputy==-1 then
 			this.spr_offx=0
@@ -170,7 +175,7 @@ weapon =
 			this.flip.y=false
 			this.spr=17
 			
-			diry=-1
+			this.dir.y=-1
 
 		else
 			if (inputx==-1 and player.wall_touching) then
@@ -180,7 +185,7 @@ weapon =
 				this.flip.y=false
 				this.spr=16
 				
-				dirx = 1
+				this.dir.x = 1
 
 			elseif (inputx==1 and player.wall_touching) then
 				this.spr_offx=-7
@@ -189,7 +194,7 @@ weapon =
 				this.flip.y=false
 				this.spr=16
 
-				dirx=-1
+				this.dir.x=-1
 				
 			elseif inputx==1 or this.p_inputx==1  then 
 				this.spr_offx=7
@@ -198,7 +203,7 @@ weapon =
 				this.flip.y=false
 				this.spr=16
 
-				dirx=1
+				this.dir.x=1
 				
 			elseif inputx==-1 or this.p_inputx==-1 then
 				this.spr_offx=-7
@@ -207,14 +212,15 @@ weapon =
 				this.flip.y=false
 				this.spr=16
 
-				dirx=-1
+				this.dir.x=-1
 				
 			end
 		end
 
 		-- shoot --
 		-----------
-			if shoot then init_obj(ray, this.x, this.y, dirx*10, diry*10) end
+			if change then if this.w_type==shot then this.w_type=ray else this.w_type=shot end end
+			if shoot then init_obj(this.w_type, this.x, this.y, this.dir.x*10, this.dir.y*10) end
 
 		-----------
 
@@ -261,21 +267,23 @@ shot={
 ray={
 	init=function(this)
 		this.hitbox={x=0, y=0, w=16, h=3}
+		shake=true
 	end,
 
 	update=function(this)
-		this.x=p.x+sign(this.spd.x)*8
-		this.y=p.y+3
+		
+		if w.dir.y==1 then this.x=w.x+2 this.y=w.y+13 elseif w.dir.y==-1 then this.x=w.x+2 this.y=w.y-8 elseif
+			w.dir.x==1 then this.x=w.x+12 this.y=w.y+3 elseif w.dir.x==-1 then this.x=w.x-8 this.y=w.y+3 end
 
-		if not btn(k_shoot) then del(objects, this) end
+		if not btn(k_shoot) then shake = false del(objects, this) end
 	end,
 
 	draw=function(this)
 		for i=0, 16, 3 do
-			local y=this.y+rnd(2)
-			local y_off=this.y+rnd(4)
-			local x_off=this.x+i*sign(this.spd.x)+rnd(4)
-			local x=this.x+i*sign(this.spd.x)
+			local y=this.y+i*w.dir.y+rnd(2)
+			local y_off=this.y+i*w.dir.y+rnd(4)
+			local x_off=this.x+i*w.dir.x+rnd(4)
+			local x=this.x+i*w.dir.x+rnd(2)
 			rectfill(x, y, x_off, y_off, 8)
 			rect(x, y, x_off, y_off, 7)
 		end
@@ -481,8 +489,13 @@ function _draw()
 	camera()
 	
 	if p~=nil then
-		cam_x=64*8
-		cam_y=p.y - 100
+		if shake then 
+			cam_x=64*8+rnd(2)
+			cam_y=p.y - 100+rnd(2)
+		else
+			cam_x=64*8
+			cam_y=p.y - 100
+		end
 
 		print(d.open, 0, 0)
 		print(p.x .. "  " .. p.y, 25, 0)
@@ -500,9 +513,11 @@ function _draw()
 end
 p=nil
 d=nil
+w=nil
 function _init()
 	d=init_obj(door, 64*8, 60*8)
 	p=init_obj(player, 65*8, 100)
+	w=init_obj(weapon, p.x, p.y)
 end
 
 function _update()
