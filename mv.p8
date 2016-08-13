@@ -408,7 +408,7 @@ door={
 		for i=this.x, this.x+8 do
 			for j=this.y, this.y+16 do
 				local c=pget(i, j)
-				if c==5 or c==6 or c==7 then pset(i, j, 8) end
+				if c==12 then pset(i, j, 8) end
 			end
 		end
 	end
