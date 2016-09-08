@@ -8,13 +8,13 @@ __lua__
 ----------------------
 
 objects = {}	-- all the objects active in the game
-shake=false		-- camera shake
+shake=0			-- camera shake
 pause=false
 current_id=0
 message=""
 
 has_walljump=true
-has_bullet=false
+has_bullet=true
 has_ray=true
 
 k_left=0
@@ -206,13 +206,12 @@ player_death={
 		this.state=0
 		this.distance=1
 		this.time=0
-		shake=true
+		shake=10
 	end,
 
 	update=function( this )
 			
 		if this.state==1 then 
-			shake=false
 			this.time+=1
 
 			if this.time>=10 then this.state=2 end
@@ -387,11 +386,11 @@ bullet={
 		if this.state==0 and (this.is_solid(sign(this.spd.x), 0) or this.is_solid(0, sign(this.spd.y)) or this.time>this.maxtime) then
 			--del(objects, this)
 			this.state=1
-			shake=true
+			shake=10
 			this.time=0
 		end
 
-		if this.state==1 and this.time>3 then shake=false del(objects, this) end
+		if this.state==1 and this.time>3 then del(objects, this) end
 
 		this.time+=0.75
 	end,
@@ -414,26 +413,26 @@ ray={
 	end,
 
 	update=function(this)
-		-- this.length=16
-		-- for i=1, this.length do
-		-- 	if w.dir.y==1 then 
-		-- 		this.x=w.x+2 this.y=w.y+6
-		-- 		this.hitbox.w=3 this.hitbox.h=i
-		-- 	elseif w.dir.y==-1 then 
-		-- 		this.x=w.x+2 this.y=w.y+2
-		-- 		this.hitbox.w=3 this.hitbox.h=i this.y-=this.hitbox.h
-		-- 	elseif w.dir.x==1 then 
-		-- 		this.x=w.x+5 this.y=w.y+3
-		-- 		this.hitbox.w=i this.hitbox.h=3
-		-- 	elseif w.dir.x==-1 then 
-		-- 		this.x=w.x+2 this.y=w.y+3
-		-- 		this.hitbox.w=i this.x-=this.hitbox.w this.hitbox.h=3
-		-- 	end
+		this.length=16
+		for i=1, this.length do
+			if w.dir.y==1 then 
+				this.x=w.x+2 this.y=w.y+6
+				this.hitbox.w=3 this.hitbox.h=i
+			elseif w.dir.y==-1 then 
+				this.x=w.x+2 this.y=w.y+2
+				this.hitbox.w=3 this.hitbox.h=i this.y-=this.hitbox.h
+			elseif w.dir.x==1 then 
+				this.x=w.x+5 this.y=w.y+3
+				this.hitbox.w=i this.hitbox.h=3
+			elseif w.dir.x==-1 then 
+				this.x=w.x+2 this.y=w.y+3
+				this.hitbox.w=i this.x-=this.hitbox.w this.hitbox.h=3
+			end
 
-		-- 	if this.is_solid(0, 0) then this.length=i-1 break end
-		-- end
+			if this.is_solid(0, 0) then this.length=i-1 break end
+		end
 
-		-- if this.length<16 then this.collided=true shake=true else this.collided=false shake=false end
+		if this.length<16 then this.collided=true shake=10 else this.collided=false shake=0 end
 		
 		if w.dir.y==1 then 
 			this.x=w.x+2 this.y=w.y+6
@@ -449,7 +448,7 @@ ray={
 			this.hitbox.w=this.length this.x-=this.hitbox.w this.hitbox.h=3
 		end
 
-		if not btn(k_shoot) then shake = false del(objects, this) end
+		if not btn(k_shoot) then shake = 0 del(objects, this) end
 	end,
 
 	draw=function(this)
@@ -589,8 +588,9 @@ door={
 
 		if this.check_overlap_actor(this.weapon, 1, 0) or this.check_overlap_actor(this.weapon, -1, 0) then this.open=true end
 
-		if this.check_overlap_actor(player, 4, 0) or this.check_overlap_actor(player, -4, 0) then 
+		if this.check_overlap_actor(player, 0, 0) or this.check_overlap_actor(player, 0, 0) then 
 			this.p_collide=true
+			this.open=true
 		else 
 			this.p_collide=false
 		end
@@ -632,19 +632,20 @@ door={
 
 cam={
 	init=function(this)
-		this.x=room.x
-		this.y=room.y
-		this.room_start=true
+		this.x=0
+		this.y=0
+		
 	end,
 
 	update=function(this)
 
-		if shake then 
-			this.x=room.x+rnd(2)-1
-			this.y=room.y+rnd(2)-1
+		if shake>0 then 
+			this.x=0+rnd(2)-1
+			this.y=0+rnd(2)-1
+			shake-=1
 		else
-			this.y=room.y
-			this.x=room.x
+			this.y=0
+			this.x=0
 		end
 
 	end,
@@ -652,14 +653,7 @@ cam={
 	draw=function(this)
 		camera(this.x, this.y)
 
-		if this.room_start then
-			map(0, 0, 0, 0, 64, 128)
-			spawn_objects()
-			map(flr(this.x/8), flr(this.y/8), flr(this.x/8)*8, flr(this.y/8)*8, 17, 17, 1)
-			this.room_start=false
-		else
-			map(flr(this.x/8), flr(this.y/8), flr(this.x/8)*8, flr(this.y/8)*8, 17, 17, 1)
-		end
+		
 	end
 }
 
@@ -667,46 +661,103 @@ room={
 	init=function(this)
 		this.state=0	-- still state
 		this.target={x=0, y=0}
-		this.y=48*8
-		this.x=48*8
+		this.index={x=48, y=48}
+		this.room_start=true
 	end,
 
 	update=function(this)
 		
 
-		if p~=nil and this.state==0 then
-			if p.x<this.x then 
-				this.state=1	-- transition state
+		-- if p~=nil and this.state==0 then
+		-- 	if p.x<this.x then 
+		-- 		this.state=1	-- transition state
+		-- 		pause=true
+		-- 		this.target.x=this.x-128
+		-- 		this.target.y=this.y
+		-- 	elseif p.x>this.x+128 then 
+		-- 		this.state=1	-- transition state
+		-- 		pause=true
+		-- 		this.target.x=this.x+128
+		-- 		this.target.y=this.y
+		-- 	elseif p.y<this.y then 
+		-- 		this.state=1	-- transition state
+		-- 		pause=true
+		-- 		this.target.y=this.y-128
+		-- 		this.target.x=this.x
+		-- 	elseif p.y>this.y+128 then 
+		-- 		this.state=1	-- transition state
+		-- 		pause=true
+		-- 		this.target.y=this.y+128
+		-- 		this.target.x=this.x
+		-- 	end
+		-- end
+
+		if this.state==1 then
+			pause=false
+			this.state=0
+			this.room_start=true;
+		end
+
+		if p~= nil and this.state==0 then
+			if p.x<0 then
+				this.state=1
 				pause=true
-				this.target.x=this.x-128
-				this.target.y=this.y
-			elseif p.x>this.x+128 then 
-				this.state=1	-- transition state
+				p.x=120
+				p.y-=1
+
+				--this.target.x=120
+				--this.target.y=p.y
+				this.index.x-=16
+			elseif p.x>126 then
+				this.state=1
 				pause=true
-				this.target.x=this.x+128
-				this.target.y=this.y
-			elseif p.y<this.y then 
-				this.state=1	-- transition state
+				p.x=0
+				p.y-=1
+				--this.target.x=0
+				--this.target.y=p.y
+				this.index.x+=16
+			elseif p.y+8<0 then
+				this.state=1
 				pause=true
-				this.target.y=this.y-128
-				this.target.x=this.x
-			elseif p.y>this.y+128 then 
-				this.state=1	-- transition state
+				p.y=128
+				--this.target.y=128
+				--this.target.x=p.x
+				this.index.y-=16
+			elseif p.y>128 then
+				this.state=1
 				pause=true
-				this.target.y=this.y+128
-				this.target.x=this.x
+				p.y=8
+				--this.target.y=8
+				--this.target.x=p.x
+				this.index.y+=16
 			end
 		end
 
-		if this.state==1 then
-			this.x=appr(this.x, this.target.x, 3)
-			this.y=appr(this.y, this.target.y, 3)
+		
 
-			if this.x==this.target.x and this.y==this.target.y then this.state=0 pause=false end
-		end
+		-- 	pause=false
+		-- 	this.state=0
+		-- 	p.x=this.target.x
+		-- 	p.y=this.target.y
+		-- 	if p~=nil then
+		-- 		if p.x!=this.target.x then p.x=appr(p.x, this.target.x, 5) end
+		-- 		if p.y!=this.target.y then p.y=appr(p.y, this.target.y, 5) end
+		-- 	end
+
+		-- 	if p.x==this.target.x and p.y==this.target.y then this.state=0 pause=false end
+		--end
 	end,
 
 	draw=function(this)
+		map(this.index.x, this.index.y, 0, 0, 16, 16, 1)
+		if this.room_start then
+			map(this.index.x, this.index.y, 0, 0, 16, 16)
+			spawn_objects()
+			map(this.index.x, this.index.y, 0, 0, 16, 16, 1)
+			this.room_start=false
+		elseif room.state==0 then
+			
+		end
 	end
 }
 
@@ -829,10 +880,17 @@ function end_object(id)
 	end
 end
 
+function destroy_objects()
+	foreach(objects, function(obj)
+				if obj.type==door then del(objects, obj) end
+		end)
+end
+
 function spawn_objects()
-	for tx=0, 127 do
-		for ty=0,63 do
-			local tile=mget(tx, ty)
+	destroy_objects()
+	for tx=0, 15 do
+		for ty=0,15 do
+			local tile=mget(room.index.x+tx, room.index.y+ty)
 			if tile==39 then init_obj(rock, tx*8, ty*8)
 			elseif tile==36 then spawn_door(tx*8, ty*8, ray, 8) 
 			elseif tile==37 then spawn_door(tx*8, ty*8, bullet, 10) end
@@ -892,8 +950,8 @@ function solid_at(x, y, w, h)
 end	
 
 function tile_flag_at(x,y,w,h,flag)
- for i=max(0,flr(x/8)),min(127,(x+w-1)/8) do
- 	for j=max(0,flr(y/8)),min(63,(y+h-1)/8) do
+ for i=max(0,flr(x/8)),min(15,(x+w-1)/8) do
+ 	for j=max(0,flr(y/8)),min(15,(y+h-1)/8) do
  		if fget(tile_at(i,j),flag) then
  			return true
  		end
@@ -903,7 +961,7 @@ function tile_flag_at(x,y,w,h,flag)
 end
 
 function tile_at(x,y)
- return mget(x, y)
+ return mget(room.index.x+x, room.index.y+y)
 end
 
 -- effects --
@@ -966,30 +1024,26 @@ end
 function _draw()
 	cls()
 
-	
-
-	-- if p~=nil then
-	-- 	print(d.open, 0, 0)
-	-- 	print(p.x .. "  " .. p.y, 25, 0)
-	-- end
-
-
 
 	room.draw(room)
 	cam.draw(cam)
+	--camera()
 
 	-- sort player so he's in front of the list and is drawn first
-	sort_player()
+	--sort_player()
 	
 	foreach(objects, function(obj)
 				--if obj.type != player then obj.type.draw(obj) end
 				obj.type.draw(obj)
 		end)
 
-	camera()
+	if p~=nil then
+		print(p.x .. "  " .. p.y, 25, 0)
+	end
+
 
 	hud.draw(hud)
-	print(#objects, 0, 0)
+	--print(#objects .. "  " .. stat(0) .. "  " .. stat(1), 0, 0)
 
 
 	--glitch(player.x, flr((128-player.x)/10))
@@ -998,23 +1052,24 @@ end
 p=nil
 w=nil
 function _init()
-	init_obj(bullet_pickup, 0, 0)
+	--init_obj(bullet_pickup, 0, 0)
 	hud.init(hud)
 	room.init(room)
 	cam.init(cam)
-	init_obj(player_spawn, 54*8, 62*8)
-	init_obj(bullet_pickup, 2*8, 58*8)
-	init_obj(walljump_pickup, 94*8, 61*8)
-	init_obj(rock, 51*8, 62*8)
+	init_obj(player_spawn, 50, 100)
+	-- init_obj(bullet_pickup, 2*8, 58*8)
+	-- init_obj(walljump_pickup, 94*8, 61*8)
+	-- init_obj(rock, 51*8, 62*8)
 	
 end
 
 function _update()
+	room.update(room)
+	cam.update(cam)
 	foreach(objects, function(obj)
 				obj.type.update(obj)
 		end)
-	room.update(room)
-	cam.update(cam)
+	
 	hud.update(hud)
 end
 __gfx__
