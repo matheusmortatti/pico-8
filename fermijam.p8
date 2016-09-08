@@ -23,6 +23,20 @@ k_hyperdrive=4	-- second player button
 objects={}
 drive_fuel=100
 shake=0
+system_transmition=0
+max_system_transmition=1
+
+-- planet information --
+------------------------
+
+n_weather=6
+_weather={"extreme cold", "cold", "extreme hot", "hot", "mild", "tropical"}
+
+n_life=3
+_life={"void", "intermitent", "abundant"}
+
+n_message=0
+_messages={}
 
 ship={
 	
@@ -50,7 +64,7 @@ ship={
 
 
 		----------------------------------------
-		-- 			Normal State              --
+		-- 			normal state              --
 		----------------------------------------
 		if this.ship_state==0 then
 
@@ -61,7 +75,7 @@ ship={
 
 			if btn(k_up) then this.dir=1 elseif btn(k_down) then this.dir=-1 end
 
-			-- Planet collision
+			-- planet collision
 			this.planet_dock=this.overlap_actor(0, 0)
 			if this.planet_dock~=nil and this.planet_dock.type==planet and this.ship_state==0 then 
 				this.ship_state=1
@@ -97,11 +111,11 @@ ship={
 
 			
 		----------------------------------------
-		-- 			Docking State             --
+		-- 			docking state             --
 		----------------------------------------
 		elseif this.ship_state==1 then
 
-			-- Ajusting position
+			-- ajusting position
 			if this.docking_state==0 then
 
 				this.speed=0
@@ -109,30 +123,36 @@ ship={
 				this.y=appr(this.y, this.target.y, 0.2)
 				this.rotation=appr(this.rotation, flr(this.rotation+0.5), 0.02)
 
-				-- Changing state
+				-- changing state
 				if this.rotation==flr(this.rotation) and this.x==this.target.x and this.y==this.target.y then 
 					this.docking_state=1 
 				end
 
-			-- Docking
+			-- docking
 			elseif this.docking_state==1 then
 				this.scale = appr(this.scale, 0.2, 0.02)
 
-				-- Changing state
+				-- changing state
 				if this.scale==0.2 then 
 					this.docking_state=2 
 					del(objects, this.message)
-					this.message=init_obj(message, this.x-56, this.y+25, nil, "* transmition incoming *#'@($*&ˆ%@*$%&#!@*&!%ˆ&@$!@#!ˆ@&$ˆ*&!@ˆ$&@'") 
+					
+					if this.planet_dock~=nil and this.planet_dock.transmition then
+						this.message=init_obj(message, this.x-56, this.y+25, nil, "* transmition incoming *#'@($*&ˆ%@*$%&#!@*&!%ˆ&@$!@#!ˆ@&$ˆ*&!@ˆ$&@'")
+
+					elseif this.planet_dock~=nil then
+						this.message=init_obj(message, this.x-56, this.y+25, nil, this.planet_dock.info)
+					end
 				end
 
-			-- Getting message state
+			-- getting message state
 			elseif this.docking_state==2 then
 
 				if btn(k_up) then 
 					this.docking_state=3
 				end
 
-			-- Getting off the planet
+			-- getting off the planet
 			elseif this.docking_state==3 then
 
 				this.scale = appr(this.scale, 1, 0.01)
@@ -140,13 +160,13 @@ ship={
 				this.x+=this.speed*sin(this.rotation) 
 				this.y-=this.speed*cos(this.rotation)
 
-				-- End of docking process
+				-- end of docking process
 				if this.scale==1 then this.ship_state=0 this.docking_state=0 del(objects, this.message) end
 			end
 
 
 		----------------------------------------
-		-- 			HyperDrive State          --
+		-- 			hyperdrive state          --
 		----------------------------------------
 		elseif this.ship_state==2 then
 			shake=1
@@ -164,9 +184,9 @@ ship={
 				this.speed=2 
 
 				clear_obj() 
-				generate(this.x, this.y, -1, 100)
+				generate(this.x, this.y, 128, -1, 15)
 
-				if hyperdrive_release then this.hd_state=2 this.speed=20 end
+				if hyperdrive_release then this.hd_state=2 this.speed=20 generate(this.x, this.y, 1024, 10, 500) music(-1) music(3) end
 
 			elseif this.hd_state==2 then
 
@@ -180,10 +200,10 @@ ship={
 
 		end
 
-		-- Hyperdrive generation code
+		-- hyperdrive generation code
 		if this.ship_state!=1 then
-			if hyperdrive_press then this.ship_state=2
-			elseif hyperdrive_release then generate(this.x, this.y, 10, 100) end
+			if this.ship_state!=2 and hyperdrive_press then this.ship_state=2 music(0)
+			elseif hyperdrive_release then  end
 		end
 
 		this.x+=this.speed*sin(this.rotation) 
@@ -204,11 +224,14 @@ planet={
 		this.radius = 10
 		this.col=flr(rnd(15)+1)
 		this.docked=false
+		this.transmition=false
+		if system_transmition < max_system_transmition then this.transmition=true system_transmition+=1 end
+		this.info=generate_info()
 	end,
 
 	update=function(this)
-		if this.timer > this.spawn_time+rnd(10) then
-			--init_obj(transmition, this.x, this.y)
+		if this.transmition and this.timer > this.spawn_time+rnd(10) then
+			init_obj(transmition, this.x+4, this.y+4)
 			this.timer=0
 		end
 
@@ -342,19 +365,52 @@ function clear_obj()
 	foreach(objects, function(obj)
 		if obj.type!=ship then del(objects, obj) end
 	end)
+	system_transmition=0
 end
 
-function generate(x, y, planets, stars)
+function generate(x, y, _space, planets, stars)
 	local n_star=stars
 	local n_planets=planets
+	local space=_space
 
 	for i=0, n_star do
-		init_obj(star, rnd(512)-256+x, rnd(512)-256+y)
+		init_obj(star, rnd(space)-space/2+x, rnd(space)-space/2+y)
 	end
 
 	for i=0, n_planets do
-		init_obj(planet, rnd(512)-256+x, rnd(512)-256+y)
+		init_obj(planet, rnd(space)-space/2+x, rnd(space)-space/2+y)
 	end
+
+end
+
+function generate_info()
+
+	local name = "* planet 0x"
+	local life = "life: " .. _life[flr(rnd(n_life))+1]
+	local weather = "weather: " .. _weather[flr(rnd(n_weather))+1]
+
+	for i=1, 8 do
+		if rnd(1) < 0.5 then 
+			local odds = rnd(6)
+			if odds > 0 and odds <= 1 then
+				name = name .. "a"
+			elseif odds >= 1 and odds <= 2 then
+				name = name .. "b"
+			elseif odds > 2 and odds <= 3 then
+				name = name .. "c"
+			elseif odds > 3 and odds <= 4 then
+				name = name .. "d"
+			elseif odds > 4 and odds <= 5 then
+				name = name .. "e"
+			elseif odds > 5 and odds <= 6 then
+				name = name .. "f"
+			end
+		else name = name .. flr(rnd(10)) end
+	end
+
+	name = name .. " *"
+
+	return name .. "#" .. life .. "#" .. weather
 
 end
 
@@ -376,7 +432,9 @@ function _draw()
 	if player~=nil then player.type.draw(player) end
 
 	camera()
+	print(stat(0) .. "  " .. stat(1), 50, 0)
 	hud.draw(this)
+	
 	if draw_message~=nil then draw_message.type.draw(draw_message) end
 	--print(message)
 
@@ -394,7 +452,7 @@ function _update()
 end
 
 function _init()
-	generate(64, 64, 10, 100)
+	generate(64, 64, 1024, 10, 500)
 	hud.init(hud)
 	player=init_obj(ship, 64, 64)
 
@@ -626,11 +684,11 @@ __map__
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
-000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0103000000470004720147001472024700247203470034720447004472054700547206470064720747007472084700847209470094720b4700b4720c4700c4720d4700d4720e4700e4720f4700f4721047010472
+010100002f2712e2712d1712c2712b2712a271292712827127271262712527124271232712227121271202711f2711e2711d2711c2711b2711a27119271182711727116271152711427113271122711127110271
+011000001147011470114701147211470114701147211470114701147211470114701147011472114701147011472114701147011470114721147011472114701147011470114701147011472114701147211470
+0104000011470104700f4700e4700d4700c4700b4700a470094700847007470064700547004470034700247001450004400043000420004100041000410004100040000400004000040000400004000040000400
+011000000b64002640046400964007640056400764000640026400b6400464007640026400764000640006400b64002640046400964007640056400b6400064002640096400464007640056400b640006400b640
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -691,10 +749,10 @@ __sfx__
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __music__
-00 41424344
-00 41424344
-00 41424344
-00 41424344
+00 00414344
+03 02044344
+03 03424344
+01 03424344
 00 41424344
 00 41424344
 00 41424344
