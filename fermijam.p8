@@ -38,10 +38,14 @@ _life={"void", "intermitent", "abundant"}
 n_message=0
 _messages={}
 
+p_distance=0
+_sun=nil
+
 ship={
 	
 	init=function(this)
 		this.rotation=0
+		this.target_rotation=0
 		this.scale=1
 		this.speed=0
 		this.dir=0
@@ -86,8 +90,10 @@ ship={
 			
 
 			-- rotate ship
-			if btn(k_right) then this.rotation-=0.05
-			elseif btn(k_left) then this.rotation +=0.05 end
+			if btn(k_right) then this.target_rotation-=0.05
+			elseif btn(k_left) then this.target_rotation +=0.05 end
+
+			this.rotation=appr(this.rotation, this.target_rotation, 0.03)
 
 			-- movement
 			local target_speed=2
@@ -114,13 +120,17 @@ ship={
 		-- 			docking state             --
 		----------------------------------------
 		elseif this.ship_state==1 then
+			
+			
 
 			-- ajusting position
 			if this.docking_state==0 then
+				this.target.x=this.planet_dock.x
+				this.target.y=this.planet_dock.y
 
 				this.speed=0
-				this.x=appr(this.x, this.target.x, 0.2)
-				this.y=appr(this.y, this.target.y, 0.2)
+				this.x=appr(this.x, this.target.x, 1.5)
+				this.y=appr(this.y, this.target.y, 1.5)
 				this.rotation=appr(this.rotation, flr(this.rotation+0.5), 0.02)
 
 				-- changing state
@@ -131,6 +141,8 @@ ship={
 			-- docking
 			elseif this.docking_state==1 then
 				this.scale = appr(this.scale, 0.2, 0.02)
+				this.x=this.planet_dock.x
+				this.y=this.planet_dock.y
 
 				-- changing state
 				if this.scale==0.2 then 
@@ -147,6 +159,8 @@ ship={
 
 			-- getting message state
 			elseif this.docking_state==2 then
+				this.x=this.planet_dock.x
+				this.y=this.planet_dock.y
 
 				if btn(k_up) then 
 					this.docking_state=3
@@ -174,25 +188,22 @@ ship={
 				this.hd_timer+=1
 
 				this.speed=appr(this.speed, 2, 0.1)
-				-- this.x+=this.speed*sin(this.rotation) 
-				-- this.y-=this.speed*cos(this.rotation)
 
 				if this.speed==2 and this.hd_timer>20 then this.hd_state=1 this.hd_timer=0 end
+				if hyperdrive_release then this.ship_state=0 this.hd_state=0 this.hd_timer=0 end
 
 			elseif this.hd_state==1 then
 
-				this.speed=2 
+				this.speed=8
 
 				clear_obj() 
 				generate(this.x, this.y, 128, -1, 15)
 
-				if hyperdrive_release then this.hd_state=2 this.speed=20 generate(this.x, this.y, 1024, 10, 500) music(-1) music(3) end
+				if hyperdrive_release then this.hd_state=2 this.speed=20 generate(this.x, this.y, 1024, 5, 500, true) music(-1) music(3) end
 
 			elseif this.hd_state==2 then
 
 				this.speed=appr(this.speed, 1, 1.5)
-				-- this.x+=this.speed*sin(this.rotation) 
-				-- this.y-=this.speed*cos(this.rotation)
 
 				if this.speed==1 then this.hd_state=0 this.ship_state=0 end
 
@@ -203,7 +214,7 @@ ship={
 		-- hyperdrive generation code
 		if this.ship_state!=1 then
 			if this.ship_state!=2 and hyperdrive_press then this.ship_state=2 music(0)
-			elseif hyperdrive_release then  end
+			elseif hyperdrive_release and this.hd_state==0 then  music(-1) end
 		end
 
 		this.x+=this.speed*sin(this.rotation) 
@@ -212,6 +223,8 @@ ship={
 
 	draw=function(this)
 		draw_rotated(8, 0, 8, 8, this.x+4, this.y+4, this.rotation, this.scale)
+
+		if rnd(1) < 0.4 then for i=0.5, this.speed do init_obj(fire, this.x+4-3*sin(this.rotation-rnd(0.05)+0.05) , this.y+4+3*cos(this.rotation-rnd(0.05)+0.05) , this.rotation) end end
 		
 		--rectfill(this.x, this.y, this.x+this.hitbox.x+this.hitbox.w, this.y+this.hitbox.y+this.hitbox.h, white)
 	end
@@ -220,13 +233,17 @@ ship={
 planet={
 	init=function(this)
 		this.timer=0
-		this.spawn_time = 30
+		this.spawn_time = 200
 		this.radius = 10
 		this.col=flr(rnd(15)+1)
 		this.docked=false
 		this.transmition=false
 		if system_transmition < max_system_transmition then this.transmition=true system_transmition+=1 end
 		this.info=generate_info()
+		this.t=rnd(1)
+		this.distance=p_distance
+		this.center={x=0, y=0}
+
 	end,
 
 	update=function(this)
@@ -235,7 +252,9 @@ planet={
 			this.timer=0
 		end
 
-
+		this.x=this.distance*cos(this.t) + _sun.x
+		this.y=2*this.distance*sin(this.t) + _sun.y
+		this.t+=0.0001
 
 		this.timer+=1
 
@@ -248,11 +267,26 @@ planet={
 
 }
 
+sun={
+	init=function(this)
+		this.radius = 30
+	end,
+
+	update=function(this)
+
+	end,
+
+	draw=function(this)
+		circfill(this.x+4, this.y+4, this.radius, yellow)
+	end,
+
+}
+
 transmition={
 	init=function(this)
 		this.inc=0.5
 		this.radius=0
-		this.max_r=50
+		this.max_r=200
 	end,
 
 	update=function(this)
@@ -271,6 +305,7 @@ transmition={
 star={
 	init=function(this)
 		this.radius=rnd(2)
+
 	end,
 
 	update=function(this)
@@ -279,6 +314,26 @@ star={
 
 	draw=function(this)
 		circfill(this.x, this.y, this.radius, white)
+	end
+}
+
+fire={
+	init=function(this)
+		this.radius=rnd(3)
+		if rnd(1) < 0.3 then this.col=red else this.col=orange end
+	end,
+
+	update=function(this)
+		if this.radius < 0 then del(objects, this) end
+		this.radius-=0.05
+
+		this.x-=sin(this.rotation) 
+		this.y+=cos(this.rotation)
+
+	end,
+
+	draw=function(this)
+		circfill(this.x, this.y, this.radius, this.col)
 	end
 }
 
@@ -363,21 +418,28 @@ end
 
 function clear_obj()
 	foreach(objects, function(obj)
-		if obj.type!=ship then del(objects, obj) end
+		if obj.type!=ship and obj.type!=fire then del(objects, obj) end
 	end)
 	system_transmition=0
 end
 
-function generate(x, y, _space, planets, stars)
+function generate(x, y, _space, planets, stars, _has_sun)
 	local n_star=stars
 	local n_planets=planets
 	local space=_space
+	local has_sun=_has_sun
+
+	if has_sun then
+		_sun=init_obj(sun, x, y)
+		p_distance=0
+	end
 
 	for i=0, n_star do
 		init_obj(star, rnd(space)-space/2+x, rnd(space)-space/2+y)
 	end
 
 	for i=0, n_planets do
+		p_distance+=50+rnd(100)
 		init_obj(planet, rnd(space)-space/2+x, rnd(space)-space/2+y)
 	end
 
@@ -452,7 +514,7 @@ function _update()
 end
 
 function _init()
-	generate(64, 64, 1024, 10, 500)
+	generate(64, 64, 1024, 10, 500, true)
 	hud.init(hud)
 	player=init_obj(ship, 64, 64)
 
