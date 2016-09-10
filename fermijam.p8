@@ -35,8 +35,9 @@ _weather={"extreme cold", "cold", "extreme hot", "hot", "mild", "tropical"}
 n_life=3
 _life={"void", "intermitent", "abundant"}
 
-n_message=0
-_messages={}
+m_index=1
+n_messages=2
+_messages={"!@&(*&%(*$#)(!*@&)(*&&%)&$*#(!*@%&%@!(*&%*!#&!(@*%*!@&%(*#", "!@)(%*)!@(%&*@#!*@&%(*&!@(%*&(*!@($&*#)!*@%*(&@)%&)(&%$"}
 
 p_distance=0
 _sun=nil
@@ -45,7 +46,7 @@ ship={
 	
 	init=function(this)
 		this.rotation=0
-		this.target_rotation=0
+		this.rotation_speed=0
 		this.scale=1
 		this.speed=0
 		this.dir=0
@@ -58,6 +59,7 @@ ship={
 		this.message=nil
 		this.p_hyperdrive_release = false
 		this.hd_timer=0
+		this.has_hyperdrived=false
 	end,
 
 	update=function(this)
@@ -90,10 +92,11 @@ ship={
 			
 
 			-- rotate ship
-			if btn(k_right) then this.target_rotation-=0.05
-			elseif btn(k_left) then this.target_rotation +=0.05 end
+			if btn(k_right) then this.rotation_speed-=0.005 this.rotation_speed=clamp(this.rotation_speed,-0.05, 0.05)
+			elseif btn(k_left) then this.rotation_speed +=0.005 this.rotation_speed=clamp(this.rotation_speed,-0.05, 0.05)
+			else this.rotation_speed=appr(this.rotation_speed, 0, 0.005) end
 
-			this.rotation=appr(this.rotation, this.target_rotation, 0.03)
+			this.rotation+=this.rotation_speed
 
 			-- movement
 			local target_speed=2
@@ -150,7 +153,8 @@ ship={
 					del(objects, this.message)
 					
 					if this.planet_dock~=nil and this.planet_dock.transmition then
-						this.message=init_obj(message, this.x-56, this.y+25, nil, "* transmition incoming *#'@($*&ˆ%@*$%&#!@*&!%ˆ&@$!@#!ˆ@&$ˆ*&!@ˆ$&@'")
+						this.message=init_obj(message, this.x-56, this.y+25, nil, "* transmition incoming *#" .. _messages[m_index])
+						if m_index<n_messages and this.has_hyperdrived then m_index+=1 this.has_hyperdrived=false end
 
 					elseif this.planet_dock~=nil then
 						this.message=init_obj(message, this.x-56, this.y+25, nil, this.planet_dock.info)
@@ -195,11 +199,12 @@ ship={
 			elseif this.hd_state==1 then
 
 				this.speed=8
+				this.has_hyperdrived=true
 
 				clear_obj() 
 				generate(this.x, this.y, 128, -1, 15)
 
-				if hyperdrive_release then this.hd_state=2 this.speed=20 generate(this.x, this.y, 1024, 5, 500, true) music(-1) music(3) end
+				if hyperdrive_release then this.hd_state=2 this.speed=20 generate(this.x, this.y, 1500, 5, 600, true) music(-1) music(3) end
 
 			elseif this.hd_state==2 then
 
@@ -232,7 +237,7 @@ ship={
 
 planet={
 	init=function(this)
-		this.timer=0
+		this.timer=200
 		this.spawn_time = 200
 		this.radius = 10
 		this.col=flr(rnd(15)+1)
@@ -241,6 +246,7 @@ planet={
 		if system_transmition < max_system_transmition then this.transmition=true system_transmition+=1 end
 		this.info=generate_info()
 		this.t=rnd(1)
+		this.speed=rnd(0.00100)
 		this.distance=p_distance
 		this.center={x=0, y=0}
 
@@ -252,9 +258,9 @@ planet={
 			this.timer=0
 		end
 
-		this.x=this.distance*cos(this.t) + _sun.x
+		this.x=1.5*this.distance*cos(this.t) + _sun.x
 		this.y=2*this.distance*sin(this.t) + _sun.y
-		this.t+=0.0001
+		this.t+=this.speed
 
 		this.timer+=1
 
@@ -325,7 +331,7 @@ fire={
 
 	update=function(this)
 		if this.radius < 0 then del(objects, this) end
-		this.radius-=0.05
+		this.radius-=0.07
 
 		this.x-=sin(this.rotation) 
 		this.y+=cos(this.rotation)
@@ -355,7 +361,7 @@ message={
 			 sfx(35)
 			end
 		end
-		this.off={x=8,y=96}
+		this.off={x=8,y=89}
 		for i=1,this.index do
 			if sub(this.text,i,i)~="#" then
 				rectfill(this.off.x-2,this.off.y-2,this.off.x+7,this.off.y+6 ,black)
@@ -385,6 +391,7 @@ hud={
 
 }
 
+-- Initiates object on the scene
 function init_obj(type, x, y, rotation, _message)
 	local obj={}
 	obj.type = type
@@ -416,6 +423,7 @@ function init_obj(type, x, y, rotation, _message)
 	return obj
 end
 
+-- clear all(most) objects on the screen
 function clear_obj()
 	foreach(objects, function(obj)
 		if obj.type!=ship and obj.type!=fire then del(objects, obj) end
@@ -423,28 +431,32 @@ function clear_obj()
 	system_transmition=0
 end
 
+-- Generate star system
 function generate(x, y, _space, planets, stars, _has_sun)
 	local n_star=stars
 	local n_planets=planets
 	local space=_space
 	local has_sun=_has_sun
 
-	if has_sun then
-		_sun=init_obj(sun, x, y)
-		p_distance=0
-	end
+	
 
 	for i=0, n_star do
 		init_obj(star, rnd(space)-space/2+x, rnd(space)-space/2+y)
 	end
 
+	if has_sun then
+		_sun=init_obj(sun, x, y)
+		p_distance=0
+	end
+
 	for i=0, n_planets do
-		p_distance+=50+rnd(100)
+		p_distance+=35+rnd(10)
 		init_obj(planet, rnd(space)-space/2+x, rnd(space)-space/2+y)
 	end
 
 end
 
+-- Generates planet information
 function generate_info()
 
 	local name = "* planet 0x"
@@ -494,7 +506,7 @@ function _draw()
 	if player~=nil then player.type.draw(player) end
 
 	camera()
-	print(stat(0) .. "  " .. stat(1), 50, 0)
+	--print(stat(0) .. "  " .. stat(1), 50, 0)
 	hud.draw(this)
 	
 	if draw_message~=nil then draw_message.type.draw(draw_message) end
@@ -748,9 +760,9 @@ __map__
 __sfx__
 0103000000470004720147001472024700247203470034720447004472054700547206470064720747007472084700847209470094720b4700b4720c4700c4720d4700d4720e4700e4720f4700f4721047010472
 010100002f2712e2712d1712c2712b2712a271292712827127271262712527124271232712227121271202711f2711e2711d2711c2711b2711a27119271182711727116271152711427113271122711127110271
-011000001147011470114701147211470114701147211470114701147211470114701147011472114701147011472114701147011470114721147011472114701147011470114701147011472114701147211470
+011000001144011440114401144211440114401144211440114401144211440114401144011442114401144011442114401144011440114421144011442114401144011440114401144011442114401144211440
 0104000011470104700f4700e4700d4700c4700b4700a470094700847007470064700547004470034700247001450004400043000420004100041000410004100040000400004000040000400004000040000400
-011000000b64002640046400964007640056400764000640026400b6400464007640026400764000640006400b64002640046400964007640056400b6400064002640096400464007640056400b640006400b640
+011000001165011650116501165011650116501165011650116501165011650116501165011650116501165011650116501165011650116501165011650116501165011650116501165011650116501165011650
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
