@@ -52,7 +52,7 @@ rebel_messages={"~r3b3ltr4n5m1t10n~#a. #eywi##kil##ou", "~r3b3ltr4n5m1t10n~#b. #
 
 -- all encrypted messages
 n_all_messages=5
-all_messages= {"a. th***illk**lyo*", "b. ***ssdowna***hen**ft**ice", "1. we****oursav*****gels", "2. do***esa**ndyou***lbeb***sed", "3. pr**s*own**icean***en***ht"}
+all_messages= {"a. th***illk**lyo*", "b. ***ssupa***hen**ft**ice", "1. we****oursav*****gels", "2. do***esa**ndyou***lbeb***sed", "3. pr**s*own**icean***en***ht"}
 
 p_distance=0
 _sun=nil
@@ -468,7 +468,7 @@ message={
 
 sequencer={
 	init=function(this)
-		this.sequence_r={3, 0, 0}
+		this.sequence_r={2, 0, 0}
 		this.sequence_g={3, 3, 1}
 		this.r_index=1
 		this.g_index=1
@@ -551,7 +551,7 @@ cutscene_rebel={
 		this.state=0
 		this.time=0
 		pause=true
-		this.msg=init_obj(message, 0, 0, nil, "here we hide #with us you shall dwell #they are strong. #they are lethal #but we will be as well")
+		this.msg=init_obj(message, 0, 0, nil, "here we hide #with us you shall dwell #they are strong. they are lethal #but we will be as well")
 	end,
 
 	update=function(this)
@@ -606,7 +606,7 @@ _menu={
 		local name="pico paradox"
 		local by = "by"
 		local twitter = "@matheusmortatti"
-		local start = "press x to start your journey"
+		local start = "press z to start your journey"
 		local pen = "(shift)-hyperdrive-(x)-boost"
 
 		print(name, 64-#name*4/2, 20+4*cos(this.time))
