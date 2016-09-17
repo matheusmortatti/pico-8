@@ -1,6 +1,12 @@
 pico-8 cartridge // http://www.pico-8.com
 version 8
 __lua__
+
+ black=0  dark_blue=1  dark_purple=2 dark_green=3
+ brown=4  dark_gray=5  light_gray=6  white=7
+ red=8    orange=9     yellow=10     green=11
+ blue=12  indigo=13    pink=14       peach=15
+
 k_left=0
 k_right=1
 k_up=2
@@ -12,6 +18,7 @@ function _draw()
 	palt(0, false)
 	map(0, 0, 0, 0, 16, 16)
 	player_draw()
+	rectfill(0, 108, 128, 128, peach)
 	
 end
 
