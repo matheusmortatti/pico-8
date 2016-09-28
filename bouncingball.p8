@@ -17,7 +17,7 @@ end
 function _draw()
 	cls()
 	circfill(ball.x, ball.y, ball.radius, 6)
-	rectfill(p.x, p.y, p.x+8, p.y+8, 8)
+	rectfill(p.x-4, p.y-4, p.x+4, p.y+4, 8)
 end
 
 function _init()
@@ -38,8 +38,8 @@ function p_update()
 	p.p_input=btn(4)
 	p.spd.y=appr(p.spd.y, 3, 0.2)
 	p.y+=p.spd.y
-	p.y=clamp(p.y, 0, 119)
-	p.x=clamp(p.x, 0, 119)
+	p.y=clamp(p.y, 4, 123)
+	p.x=clamp(p.x, 4, 123)
 end
 
 function ball_update()
