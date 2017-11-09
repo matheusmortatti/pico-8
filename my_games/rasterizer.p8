@@ -2,86 +2,173 @@ pico-8 cartridge // http://www.pico-8.com
 version 8
 __lua__
 
--- 3D Rasterizer
--- Matheus Mortatti
+-- 3d rasterizer
+-- matheus mortatti
 
-pyramid={{{x=-1,y=-1,z=-1},
-			{x=1,y=-1,z=-1},
-			{x=1,y=1,z=-1},c=2},
-		   {{x=-1,y=-1,z=-1},
-			{x=1,y=1,z=-1},
-			{x=-1,y=1,z=-1},c=3},
-		   {{x=-1,y=-1,z=-1},
-			{x=-1,y=1,z=-1},
-			{x=0,y=0,z=1},c=4},
-		   {{x=0,y=0,z=1},
-			{x=1,y=1,z=-1},
-			{x=-1,y=1,z=-1},c=5},
-		   {{x=-1,y=-1,z=-1},
-			{x=1,y=-1,z=-1},
-			{x=0,y=0,z=1},c=6},
-		   {{x=0,y=0,z=1},
-			{x=1,y=-1,z=-1},
-			{x=1,y=1,z=-1},c=7}}
+-- colors!
+c_black=0 c_dark_blue=1 c_dark_purple=2 c_dark_green=3  
+c_brown=4 c_dark_gray=5 c_light_gray=6 c_white=7
+c_red=8 c_orange=9 c_yellow=10 c_green=11       
+c_blue=12 c_indigo=13 c_pink=14 c_peach=15
 
-objects = {}
+pyramid={  {{-1,-1,-1},
+			{1,-1,-1},
+			{1,1,-1},2},
+		   {{-1,-1,-1},
+			{1,1,-1},
+			{-1,1,-1},c=3},
+		   {{-1,-1,-1},
+			{-1,1,-1},
+			{0,0,1},c=4},
+		   {{0,0,1},
+			{1,1,-1},
+			{-1,1,-1},c=5},
+		   {{-1,-1,-1},
+			{1,-1,-1},
+			{0,0,1},c=6},
+		   {{0,0,1},
+			{1,-1,-1},
+			{1,1,-1},c=7}}
+
+objects 	= {}
+look_at 	= {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, 0}}
+trans 		= {}
+debug_info 	= {}
 										 	
-cam={x=0,y=0,z=4}
+cam={0,0,4, dir={0,0,-1}, p = {0, 0, -1}}
 mult=64
 
 function _init()
-	add(objects, pyramid)
+	create_shape(pyramid)
+	lookat(cam, cam.p)
 end
 										 	
 function _update()
-	if btn(0) then cam.x-=1 end
-	if btn(1) then cam.x+=1 end
-	--if btn(2) then cam.y-=1 end
-	if btn(3) then cam.y+=1 end
-	if btn(4) then cam.z-=1 end
-	if btn(5) then cam.z+=1 end
+	if btn(4) then update_camera_pos(-1,0,0) end--update_camera_pos(0,1,0) end
+	if btn(5) then update_camera_pos(1,0,0) end--update_camera_pos(0,-1,0) end
+	if btn(2) then rotate_point(cam,"x",0.01) rotate_point(cam.dir,"x",0.01) end---cam[2]-=1 end
+	if btn(3) then rotate_point(cam,"x",-0.01) rotate_point(cam.dir,"x",-0.01) end--cam[2]+=1 end
+	if btn(0) then rotate_point(cam,"y",0.01) rotate_point(cam.dir,"y",0.01) end
+	if btn(1) then rotate_point(cam,"y",-0.01) rotate_point(cam.dir,"y",-0.01) end--cam[3]+=1 end
 
-	drawing_order(pyramid)
-
-
-	-- if btn(2) then rotate_shape(pyramid,"y",0.005,cam) end
+	drawing_order(objects)
 	
-	rotate_shape(pyramid,"z",0.005)
-	rotate_shape(pyramid,"x",0.005)
-
+	for shape in all(objects) do
+		--rotate_shape(shape,"z",0.005)
+		rotate_shape(shape,"y",0.005)
+	end
+	lookat(cam, cam.p)
 
 end
 
 function _draw()
 	
 	cls()
+
+	rectfill(0, 0,  127, 127, c_dark_blue)
 	
 	for triangles in all(objects) do
 		for t in all(triangles) do
 
 
-			if t[1].z-cam.z<-1 and t[2].z-cam.z<-1 and t[3].z-cam.z<-1 then
-				local x1,y1=project(t[1])
-				local x2,y2=project(t[2])
-				local x3,y3=project(t[3])
+			if t[1][3]-cam[3]<-1 and t[2][3]-cam[3]<-1 and t[3][3]-cam[3]<-1 then
+				local x1,y1=project(mul_lookat(t[1]))
+				local x2,y2=project(mul_lookat(t[2]))
+				local x3,y3=project(mul_lookat(t[3]))
 				fill_tri(x1,y1,x2,y2,x3,y3,t.c)
 
-				draw_line(t[1],t[2])
-				draw_line(t[2],t[3])
-				draw_line(t[3],t[1])
+				--local x4,y4=project(t.b)
+				--pset(x4,y4,c_green)
+
+				--print("x=" .. t.b[1] .. " y=" .. t.b[2] .. " z=" .. t.b[3] .. " d=" .. dist_3d(t.b,cam))
+
+				-- draw_line(t[1],t[2])
+				-- draw_line(t[2],t[3])
+				-- draw_line(t[3],t[1])
 			end
 
 		end
 	end
 
-	print("x: " .. cam.x, 0, 0)
-	print("y: " .. cam.y, 0, 8)
-	print("z: " .. cam.z, 0, 16)
+	print("x: " .. cam[1], 0, 0, c_green)
+	print("y: " .. cam[2], 0, 8, c_green)
+	print("z: " .. cam[3], 0, 16, c_green)
 
-	print("mem: " .. stat(0),88,0)
-	print("cpu: " .. stat(1),88,8)
+	local tmp = {0,1,0}
+	local f = normalize(cam.dir)
+	local r = cross_product(tmp, f)
+
+	print("x=" .. r[1] .. " y=" .. r[2] .. " z=" .. r[3], 0, 32)
+
+	local m,c=stat(0),stat(1)
+	update_debug(c,m)
+
+	print("mem: " .. m,88,0,c_green)
+	print("cpu: " .. c,88,8,c_green)
+
+	draw_debug(88,24)
 
 end
+
+function create_shape(shape)
+	local ns = {}
+
+	for tri in all(shape) do
+		local nt = {}
+		for i=1,3 do
+			add(nt, {tri[i][1],tri[i][2],tri[i][3]})
+		end
+		nt.c=tri.c
+		add(ns, nt)
+	end
+
+	add(objects, ns)
+	return ns
+end
+
+function update_camera_pos(dx, dy, dz)
+	local tmp = {0,1,0}
+	local f = normalize(cam.dir)
+	local r = normalize(cross_product(normalize(tmp), f))
+	local u = normalize(cross_product(f, r))
+	local dir = cam.dir
+	local p = cam.p
+
+	cam = add_vec(cam, mul_vec(f, dz))
+	cam = add_vec(cam, mul_vec(r, dx))
+	cam = add_vec(cam, mul_vec(u, dy))
+	cam.dir = dir
+	cam.p = p
+	cam.p = add_vec(cam.p, mul_vec(r,dx))
+
+end
+
+------------------------
+-- debug
+------------------------
+
+function update_debug(c,m)
+	if #debug_info >= 40 then
+		for i=2,#debug_info do
+			debug_info[i-1] = debug_info[i]
+		end
+		debug_info[#debug_info] = {mem=m,cpu=c}
+	else
+		add(debug_info,{mem=m,cpu=c})
+	end
+end
+
+function draw_debug(x, y)
+	local max_y=10
+	for d in all(debug_info) do
+		line(x,y,x,y-max_y*d.cpu)
+		x+=1
+	end
+end
+
+--------------------------
+-- draw functions
+--------------------------
 
 function draw_line(p1,p2,c)
 	local x1,y1=project(p1)
@@ -90,8 +177,8 @@ function draw_line(p1,p2,c)
 end
 
 function project(p)
-	local x=(p.z-cam.z)==0 and 0 or -mult*(p.x-cam.x)/(p.z-cam.z)+127/2
-	local y=(p.z-cam.z)==0 and 0 or -mult*(p.y-cam.y)/(p.z-cam.z)+127/2
+	local x=(p[3])==0 and 0 or -mult*(p[1])/(p[3])+127/2
+	local y=(p[3])==0 and 0 or -mult*(p[2])/(p[3])+127/2
 	return x,y
 end
 
@@ -142,146 +229,164 @@ function fill_tri(x1,y1,x2,y2,x3,y3,c)
 	end	
 end
 
+-------------------------
+-- linear algebra
+-------------------------
+
+-- function mul_lookat(p)
+-- 	return {lookat[1].x*p[1]+lookat[1].y*p[2]+lookat[1].z*p[3],
+-- 			lookat[2].x*p[1]+lookat[2].y*p[2]+lookat[2].z*p[3],
+-- 			lookat[3].x*p[1]+lookat[3].y*p[2]+lookat[3].z*p[3]}
+-- end
+
+-- function look_at(cam, dir, up)
+-- 	dir = normalize(dir)
+-- 	local s = cross_product(dir, up)
+-- 	s = normalize(s)
+-- 	local u = cross_product(s, dir)
+
+-- 	dir = sub_vec({0,0,0}, dir)
+
+-- 	lookat = {s, u, dir}
+
+-- 	local mlookat = {sub_vec({0,0,0},s), sub_vec({0,0,0},u),sub_vec({0,0,0},dir)}
+-- 	trans  = {mlookat[1].x*cam[1]+mlookat[1].y*cam[2]+mlookat[1].z*cam[3],
+-- 			  mlookat[2].x*cam[1]+mlookat[2].y*cam[2]+mlookat[2].z*cam[3],
+-- 			  mlookat[3].x*cam[1]+mlookat[3].y*cam[2]+mlookat[3].z*cam[3]}
+-- 	return lookat,trans
+-- end
+
+function mul_lookat(v)
+	return {
+	v[1]*look_at[1][1] + v[2]*look_at[2][1] + v[3]*look_at[3][1] + look_at[4][1],
+	v[1]*look_at[1][2] + v[2]*look_at[2][2] + v[3]*look_at[3][2] + look_at[4][2],
+	v[1]*look_at[1][3] + v[2]*look_at[2][3] + v[3]*look_at[3][3] + look_at[4][3]
+			}
+end
+
+function lookat(from, to)
+	local tmp = {0,1,0}
+	local f = normalize(sub_vec(from, to))
+	local r = normalize(cross_product(normalize(tmp), f))
+	local u = normalize(cross_product(f, r))
+
+	look_at[1] = {r[1], r[2], r[3]}
+	look_at[2] = {u[1], u[2], u[3]}
+	look_at[3] = {f[1], f[2], f[3]}
+	look_at[4] = {-from[1], -from[2], -from[3]}
+
+end
+
+function length_vec(v)
+	return sqrt(v[1]*v[1] + v[2]*v[2] + v[3]*v[3])
+end
+
+function normalize(v)
+	local l = length_vec(v)
+	return l == 0 and {0,0,0} or 
+					  {v[1]/l,v[2]/l,v[3]/l}
+end
+
+function add_vec(v1, v2)
+	return {v1[1]+v2[1],v1[2]+v2[2],v1[3]+v2[3]}
+end
+
+function sub_vec(v1, v2)
+	return {v1[1]-v2[1],v1[2]-v2[2],v1[3]-v2[3]}
+end
+
+function mul_vec(v, a)
+	return {v[1]*a,v[2]*a,v[3]*a}
+end
+
+function dot_product(v1, v2)
+	return v1[1]*v2[1] + v1[2]*v2[2] + v1[3]*v2[3]
+end
+
+function cross_product(v1, v2)
+	return {v1[2]*v2[3] - v1[3]*v2[2],
+			v1[3]*v2[1] - v1[1]*v2[3],
+			v1[1]*v2[2] - v1[2]*v2[1]}
+end
+
+
 function rotate_shape(s,a,r,c)
 	local rotate
 
-	if 		a=="z" then rotate=rotate_point_z
-	elseif 	a=="y" then rotate=rotate_point_y
-	elseif 	a=="x" then rotate=rotate_point_x
-	end
-
 	for t in all(s) do
 		for p=1,3 do
-			rotate(t[p],r,c)
+			rotate_point(t[p],a,r,c)
 		end
 	end
 end
 
-function rotate_point_z(p,r,c)
+function rotate_point(p,a,r,c)
 	if c then
-	  p.x+=c.x
-	  p.y+=c.y
-	  p.z+=c.z
+	  p[1]+=c[1]
+	  p[2]+=c[2]
+	  p[3]+=c[3]
 	end
-  -- Figure out which axis we're rotating on
-  local _x = cos(r)*(p.x) - sin(r) * (p.y) -- Calculate the new x location
-  local _y = sin(r)*(p.x) + cos(r) * (p.y) -- Calculate the new y location
-  local np = {} -- Make new point and assign the new x and y to the correct axes
-  p.x = _x
-  p.y = _y
-  p.z = p.z
-  return np -- Return new point
-end
+	local x,y,z=1,2,3
 
-function rotate_point_y(p,r,c)
-	if c then
-	  p.x+=c.x
-	  p.y+=c.y
-	  p.z+=c.z
+	if 		a=="z" then x,y,z=1,2,3
+	elseif 	a=="y" then x,y,z=3,1,2
+	elseif 	a=="x" then x,y,z=2,3,1
 	end
-  -- Figure out which axis we're rotating on
-  local _z = cos(r)*(p.z) - sin(r) * (p.x) -- Calculate the new x location
-  local _x = sin(r)*(p.z) + cos(r) * (p.x) -- Calculate the new y location
-  local np = {} -- Make new point and assign the new x and y to the correct axes
-  p.z = _z
-  p.x = _x
-  p.y = p.y
-  return np -- Return new point
-end
-
-function rotate_point_x(p,r,c)
-  -- Figure out which axis we're rotating on
-  	if c then
-	  p.x+=c.x
-	  p.y+=c.y
-	  p.z+=c.z
-	end
-  local _y = cos(r)*(p.y) - sin(r) * (p.z) -- Calculate the new x location
-  local _z = sin(r)*(p.y) + cos(r) * (p.z) -- Calculate the new y location
-  local np = {} -- Make new point and assign the new x and y to the correct axes
-  p.y = _y
-  p.z = _z
-  p.x = p.x
-  return np -- Return new point
-end
-
-function bubblesort_tri(tri)
-	for i=1,#tri do
-		for j=1, #tri-1 do
-			if dist_3d(tri[j].b,cam) < dist_3d(tri[j+1].b,cam) then
-				tri[j],tri[j+1] = tri[j+1],tri[j]
-			end
-		end
-	end
-
-	return tri
-end
-
-function bubblesort_points(p)
-	for i=1, #p do
-		for j=1, #p-1 do
-			if dist_3d(p[j],cam) > dist_3d(p[j+1],cam) then
-				p[j],p[j+1] = p[j+1],p[j]
-			end
-		end
-	end
-
-	return p
-end
-
-function drawing_order(tri)
-	for i=1,#tri do
-		tri[i].b={x=(tri[i][1].x+tri[i][2].x+tri[i][3].x)/3,
-				  y=(tri[i][1].y+tri[i][2].y+tri[i][3].y)/3,
-				  z=(tri[i][1].z+tri[i][2].z+tri[i][3].z)/3}
-	end
-
-	tri = bubblesort_tri(tri)
-end
-
-function mergesort_tri(table, i, j)
-	if(i < j) then
-		local q = flr((i + j) / 2)
-
-		mergesort_tri(table, i, q)
-		mergesort_tri(table, q+1, j)
-		merge_tri(table, i, q, j)
-	end
-end
-
-function merge_tri(table, p, q, r)
-	local n1 = q - p + 1
-	local n2 = r - q
-	local l = {}
-	local m = {}
-
-	for i=1, n1 do
-		add(l, table[p+i-1])
-	end
-	add(l, nil)
-
-	for i=1, n2 do
-		add(m, table[q+i])
-	end
-	add(m, nil)
-
-	local i = 1 
-	local j = 1
-
-	for k = p, r do
-		if(l[i] ~= nil and (m[j] == nil or dist_3d(l[i][1],cam) < dist_3d(m[j][1],cam))) then
-			table[k] = l[i]
-			i+=1
-		else
-			table[k] = m[j]
-			j+=1
-		end
-	end
-
+  -- figure out which axis we're rotating on
+  local _x = cos(r)*(p[x]) - sin(r) * (p[y]) -- calculate the new x location
+  local _y = sin(r)*(p[x]) + cos(r) * (p[y]) -- calculate the new y location
+  --local np = {} -- make new point and assign the new x and y to the correct axes
+  p[x] = _x
+  p[y] = _y
+  p[z] = p[z]
+  --return np -- return new point
 end
 
 function dist_3d(p1,p2)
-	return sqrt((p1.x-p2.x)*(p1.x-p2.x) + (p1.y-p2.y)*(p1.y-p2.y) + (p1.z-p2.z)*(p1.z-p2.z))
+	return sqrt((p1[1]-p2[1])*(p1[1]-p2[1]) + (p1[2]-p2[2])*(p1[2]-p2[2]) + (p1[3]-p2[3])*(p1[3]-p2[3]))
+end
+
+----------------------------
+-- sorting
+----------------------------
+
+function insertion_sort(a)
+	local j=0
+	for i=1,#a do
+		local e = a[i]
+		j = i-1
+
+		while j>=1 and dist_3d(e.b,cam) > dist_3d(a[j].b,cam) do
+			a[j+1]=a[j]
+			j-=1
+		end
+		if j ~= i-1 then
+			a[j+1] = e
+		end
+	end
+
+	return a
+end
+
+function drawing_order(obj)
+
+	for tri in all(obj) do
+
+		local _x,_y,_z = 0,0,0
+		for i=1,#tri do
+			tri[i].b={(tri[i][1][1]+tri[i][2][1]+tri[i][3][1])/3,
+					  (tri[i][1][2]+tri[i][2][2]+tri[i][3][2])/3,
+					  (tri[i][1][3]+tri[i][2][3]+tri[i][3][3])/3}
+			_x,_y,_z=_x+tri[i].b[1],_y+tri[i].b[2],_z+tri[i].b[3]
+		end
+		_x,_y,_z=_x/#tri,_y/#tri,_z/#tri
+		tri = insertion_sort(tri)
+		tri.b = {_x,_y,_z}
+	end
+
+	obj = insertion_sort(obj)
+
+	
 end
 
 __gfx__
