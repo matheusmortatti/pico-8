@@ -1,5 +1,5 @@
 pico-8 cartridge // http://www.pico-8.com
-version 8
+version 14
 __lua__
 
 objects = {}
@@ -108,12 +108,12 @@ player = {
 		this.invincible = false
 		this.inv_timer = 0
 
-		-- A buffer to store up to ib_size frames of inputs
+		-- a buffer to store up to ib_size frames of inputs
 		this.input_buffer = {}
 		this.ib_size = 3
 		for i=1,this.ib_size do add(this.input_buffer, false) end
 
-		-- A buffer to store up to gb_size frames of when the player was grounded
+		-- a buffer to store up to gb_size frames of when the player was grounded
 		this.ground_buffer = {}
 		this.gb_size = 3
 		for i=1,this.gb_size do add(this.ground_buffer, false) end
@@ -171,16 +171,17 @@ player = {
 		this.parent.update(this)
 
 		-------------------------------
-		-- Buffers
+		-- buffers
 		------------------------------
 
 		local has_jumped = false
 		for i=1,this.ib_size do 
 			has_jumped = has_jumped or this.input_buffer[i]
 		end
+		has_jumped = has_jumped
 
-		local jump = btnp(4) and not this.pjump and this.jump_count > 0
-		this.pjump = btnp(4)
+		local jump = btn(4) and not this.pjump
+		this.pjump = btn(4)
 
 		for i=2,this.ib_size do
 			this.input_buffer[i-1] = this.input_buffer[i]
@@ -191,6 +192,7 @@ player = {
 		for i=1,this.gb_size do
 			grounded = grounded or this.ground_buffer[i]
 		end
+		grounded = grounded
 
 		for i=2,this.gb_size do
 			this.ground_buffer[i-1] = this.ground_buffer[i]
@@ -200,16 +202,18 @@ player = {
 		-------------------------------
 		-- movement
 		------------------------------
-		this.jump_max = has_djump and 2 or 1
-
-		if ((jump or has_jumped) and this.on_ground) or 
-		   (jump and not this.on_ground and grounded) or
-		   (jump and this.jump_count > 0) then
-			this.vy = -this.jumpheight 
-			this.jump = true
-		elseif this.on_ground then
+	 if this.on_ground then
 			this.jump_count = this.jump_max
 			this.jump = false
+		end
+		this.jump_max = has_djump and 2 or 1
+		printh(grounded)
+		if (((jump or has_jumped) and this.jump_count > 0) and this.on_ground) or 
+		   (jump and this.jump_count > 0 and not this.on_ground and grounded) or
+		   (jump and this.jump_count > 0) then
+			this.vy = -this.jumpheight 
+
+			this.jump = true
 		elseif not this.on_ground and this.jump_count == this.jump_max then
 			this.jump_count -= 1
 		end
@@ -530,8 +534,6 @@ flyer = {
 		--x, y = -x,-y
 
 		this.vx, this.vy = x*3, y*3
-
-		pause_movement = 5
 	end
 }
 
