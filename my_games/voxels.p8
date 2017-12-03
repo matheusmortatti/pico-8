@@ -1,436 +1,161 @@
 pico-8 cartridge // http://www.pico-8.com
 version 14
 __lua__
+---------------------
+-- voxel rendering
+-- [m.mortatti]
+---------------------
 
--- 3d rasterizer
--- matheus mortatti
+---------------------
+-- to-do
+--
+-- 1.
+--
+-- add drawing order
+-- technique (sorting)
+---------------------
 
--- colors!
-c_black=0 c_dark_blue=1 c_dark_purple=2 c_dark_green=3  
-c_brown=4 c_dark_gray=5 c_light_gray=6 c_white=7
-c_red=8 c_orange=9 c_yellow=10 c_green=11       
-c_blue=12 c_indigo=13 c_pink=14 c_peach=15
-
-palette = {
-	{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-	{0, 1, 2, 3, 2, 5, 6, 7, 8, 4, 9, 11, 12, 13, 14, 9},
-	{0, 1, 1, 3, 2, 1, 13, 6, 2, 3, 4, 3, 13, 5, 4, 4},
-	{0, 0, 1, 1, 1, 1, 5, 13, 2, 2, 2, 3, 5, 1, 2, 2},
-	{0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-}
-
-pyramid={  {{-1,-1,-1},
-			{1,1,-1},
-			{1,-1,-1},c=7},
-		   {{-1,-1,-1},
-			{-1,1,-1},
-			{1,1,-1},c=7},
-		   {{-1,-1,-1},
-			{0,0,1},
-			{-1,1,-1},c=7},
-		   {{0,0,1},
-			{1,1,-1},
-			{-1,1,-1},c=7},
-		   {{-1,-1,-1},
-			{1,-1,-1},
-			{0,0,1},c=7},
-		   {{0,0,1},
-			{1,-1,-1},
-			{1,1,-1},c=7}}
-
-objects 	= {}
-look_at 	= {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, 0}}
-trans 		= {}
-debug_info 	= {}
-										 	
-cam={pos={0,0,4}, dir={0,0,-1}}
-mult=64
-
-light = {0, -1, -1}
-
-pitch=0
-yaw=0
+cama=0
+mult=50
 
 function _init()
-	create_shape(pyramid)
-	fps(cam.dir,0,0)
-end
-										 	
-function _update()
-	if btn(4) then update_camera_pos(-1) end
-	if btn(5) then update_camera_pos(1) end
-	if btn(2) then rotate_point(light, "x", -0.01) end--pitch+=0.005 end
-	if btn(3) then rotate_point(light, "x", 0.01) end--pitch-=0.005 end
-	if btn(0) then yaw-=0.005 end --rotate_point(light, "y", -0.005) end
-	if btn(1) then yaw+=0.005 end--rotate_point(light, "y", 0.005) end
-
-	drawing_order(objects)
+	p = {}
+	d = {}
 	
-	for shape in all(objects) do
-		--rotate_shape(shape,"z",0.005)
-		--rotate_shape(shape,"x",0.005)
-		--rotate_shape(shape,"y",0.005)
+	for l=1,16 do
+		p[l] = {}
+		for x=1,16 do
+			p[l][x] = {}
+			for y=1,16 do
+				local c = sget(((l-1)%8)*16+(x-1),
+																			y-1+64+flr((l-1)/8)*16)
+				c = c==14 and -1 or c
+				if c~=-1 then
+					add(d,{x-8.5,y-8.5,l-8.5,c})
+				end
+				p[l][x][y] = c
+			end
+		end
 	end
-	fps(cam.dir,pitch,yaw)
+	
+	t = {}
+	
+	for pt in all(d) do
+		add(t,sqrt(pt[1]*pt[1]+
+		           pt[2]*pt[2]+
+		           pt[3]*pt[3])
+		   )
+	end
 end
 
 function _draw()
-	
+
 	cls()
-
-	rectfill(0, 0,  127, 127, c_blue)
-
-	local sky = (sin(-pitch)+1)*127/2
-	rectfill(0,sky,128,128, c_dark_green)--calculate_light_n({0,-1,0},light,c_dark_green))
-	-- fillp(0b0011001111001100.1)
-	-- rectfill(0,sky-5,128,sky, calculate_light_n({0,-1,0},light,c_orange))
-	-- fillp()
-
 	
-	for triangles in all(objects) do
-		for t in all(triangles) do
-
-
-			local t1,t2,t3=mul_view(sub_vec(t[1],cam.pos)),
-						   mul_view(sub_vec(t[2],cam.pos)),
-						   mul_view(sub_vec(t[3],cam.pos))
-			local x1,y1=project(t1)
-			local x2,y2=project(t2)
-			local x3,y3=project(t3)
-			
-			if t1[3] < -0.1 and t2[3] < -0.1 and t3[3] < -0.1 then
-				--rotate_point(light, "y", 0.001)
-				local c = calculate_light(t, light, t.c)
-				fill_tri(x1,y1,x2,y2,x3,y3,c)			
+	print(cama%1)
+	--t = mergesort(t,1,#t)
+	
+	local xstart,xend,xstep
+	if cama%1<0.5 then
+		xstart=16
+		xend=1
+		xstep=-1
+	else
+		xstart=1
+		xend=16
+		xstep=1
+	end
+	
+	local ystart,yend,ystep
+	if cama%1<0.25 or cama%1>0.75 then
+		ystart=16
+		yend=1
+		ystep=-1
+	else
+		ystart=1
+		yend=16
+		ystep=1
+	end
+	
+	for i=1,#p do
+		for j=xstart,xend,xstep do
+			for k=ystart,yend,ystep do
+				if p[i][j][k]~=-1 then
+				local xx,yy,zz=
+										(j-8.5),(i-8.5),(k-8.5)
+		  local z=zz*cos(cama)-xx*sin(cama)
+		  local x=zz*sin(cama)+xx*cos(cama)
+		  local y=yy
+				draw_voxel(x,
+															y-20,
+														 z+30,
+				           p[i][j][k])
+				end
 			end
-
 		end
 	end
 
-	local n1,n2 = project(mul_view(sub_vec({0,-1,3},cam.pos)))
-	local n3,n4 = project(mul_view(add_vec(sub_vec({0,-1,3},cam.pos), mul_vec(light,1))))
-	line(n1,n2,n3,n4,c_yellow)
-	circfill(n3,n4, 2, c_green)
-
-	-- Debug --
-	print("x: " .. cam.pos[1], 0, 0, c_green)
-	print("y: " .. cam.pos[2], 0, 8, c_green)
-	print("z: " .. cam.pos[3], 0, 16, c_green)
-	--print("x: " .. light[1] .. "y: " .. light[2] .. "z: " .. light[3])
-
-	local m,c=stat(0),stat(1)
-	update_debug(c,m)
-
-	print("mem: " .. m,88,0,c_green)
-	print("cpu: " .. c,88,8,c_green)
-
-	draw_debug(88,24)
-
+	pset(127/2,127/2,11)
+	print()
 end
 
-function create_shape(shape)
-	local ns = {}
-
-	for tri in all(shape) do
-		local nt = {}
-		for i=1,3 do
-			add(nt, {tri[i][1],tri[i][2],tri[i][3]})
-		end
-		nt.c=tri.c
-		add(ns, nt)
-	end
-
-	add(objects, ns)
-	return ns
-end
-
-function update_camera_pos(d)
-
-	local dir = {cam.dir[1],cam.dir[2],cam.dir[3]}
-	local pdir = cam.dir	
-
-	rotate_point(dir,"x",pitch)
-	rotate_point(dir,"y",yaw)
-	dir=normalize(dir)
-	dir=mul_vec(dir, d)
-
-	cam.pos = add_vec(cam.pos,dir)
-	cam.dir=pdir
-
-end
-
-------------------------
--- debug
-------------------------
-
-function update_debug(c,m)
-	if #debug_info >= 40 then
-		for i=2,#debug_info do
-			debug_info[i-1] = debug_info[i]
-		end
-		debug_info[#debug_info] = {mem=m,cpu=c}
-	else
-		add(debug_info,{mem=m,cpu=c})
-	end
-end
-
-function draw_debug(x, y)
-	local max_y=10
-	for d in all(debug_info) do
-		line(x,y,x,y-max_y*d.cpu)
-		x+=1
-	end
-end
-
---------------------------
--- draw functions
---------------------------
-
-function calculate_light(t, l)
-	local v1,v2 = sub_vec(t[2], t[1]),sub_vec(t[3], t[1])
-	local n = normalize(cross_product(v1, v2))
-	local nl = normalize({-l[1], -l[2], -l[3]})
-	local angle = dot_product(nl,n) / (length_vec(n) * length_vec(nl))
+function draw_voxel(px,py,pz,col)
 	
-	angle += 1
-	angle /= 2
-	angle = abs(angle)
-
-	return palette[#palette - flr((#palette-1)*angle)][t.c+1];
-end
-
-function calculate_light_n(n, l, c)
-	local nl = normalize({-l[1], -l[2], -l[3]})
-	local angle = dot_product(nl,n) / (length_vec(n) * length_vec(nl))
+	local nx,ny=
+	mult*px/pz+127/2,-mult*py/pz+127/2
+	local size=mult/pz
 	
-	angle += 1
-	angle /= 2
-	angle = abs(angle)
-	return palette[#palette - flr((#palette-1)*angle)][c+1];
-end
-
-function draw_line(p1,p2,c)
-	local x1,y1=project(p1)
-	local x2,y2=project(p2)
-	line(x1,y1,x2,y2,c or 11)
-end
-
-function project(p)
-	local x=abs(p[3])<=0.1 and 0 or -mult*(p[1])/(p[3])+127/2
-	local y=abs(p[3])<=0.1 and 0 or -mult*(p[2])/(p[3])+127/2
-	return x,y
-end
-
-function fill_bottom_tri(x1,y1,x2,y2,x3,y3,c,p)
-	local inv1=(x2-x1)/(y2-y1)
-	local inv2=(x3-x1)/(y3-y1)
-	local cx1=x1
-	local cx2=x1
-	
-	for i=y1,y2 do
-		line(cx1,i,cx2,i,c or 8)
-		cx1+=inv1
-		cx2+=inv2
-	end
-end
-
-function fill_top_tri(x1,y1,x2,y2,x3,y3,c,p)
-	local inv1=(x3-x1)/(y3-y1)
-	local inv2=(x3-x2)/(y3-y2)
-	local cx1=x3
-	local cx2=x3
-	
-	for i=y3,y1,-1 do
-		line(cx1,i,cx2,i,c or 8)
-		cx1-=inv1
-		cx2-=inv2
-	end
-end
-
-function fill_tri(x1,y1,x2,y2,x3,y3,c)
-	if y1>y2 then y1,y2=y2,y1 x1,x2=x2,x1 end
-	if y2>y3 then y2,y3=y3,y2 x2,x3=x3,x2 end
-	if y1>y2 then y1,y2=y2,y1 x1,x2=x2,x1 end
-	if y2>y3 then y2,y3=y3,y2 x2,x3=x3,x2 end
-
-
-	if y1==y2 and y2==y3 then line(x2,y2,x3,y3,c or 8) end
-	
-	if y1==y2 then
-		fill_top_tri(x1,y1,x2,y2,x3,y3,c)
-	elseif y2==y3 then
-		fill_bottom_tri(x1,y1,x2,y2,x3,y3,c)
-	else
-		local x4,y4=x1+((y2-y1)/(y3-y1))*(x3-x1),y2
-		line(x2,y2,x4,y4,c or 8)
-		fill_bottom_tri(x1,y1,x2,y2,x4,y4,c)
-		fill_top_tri(x2,y2,x4,y4,x3,y3,c)
-	end	
-end
-
--------------------------
--- linear algebra
--------------------------
-
-function fps(eye,pitch,yaw)
-	local cosp,sinp,cosy,siny=
-			cos(pitch),sin(pitch),
-			cos(yaw),sin(yaw)
-
-	local x,y,z = {cosy,0,-siny},
-				  {siny*sinp,cosp,cosy*sinp},
-				  {siny*cosp,-sinp,cosp*cosy}
-
-	viewmatrix = {
-		{x[1],y[1],z[1],0},
-		{x[2],y[2],z[2],0},
-		{x[3],y[3],z[3],0},
-		{-dot_product(x,eye),-dot_product(y,eye),-dot_product(z,eye),1}}
-end
-
-function mul_view(v)
-	return {
-	v[1]*viewmatrix[1][1] + v[2]*viewmatrix[2][1] + v[3]*viewmatrix[3][1] + viewmatrix[4][1],
-	v[1]*viewmatrix[1][2] + v[2]*viewmatrix[2][2] + v[3]*viewmatrix[3][2] + viewmatrix[4][2],
-	v[1]*viewmatrix[1][3] + v[2]*viewmatrix[2][3] + v[3]*viewmatrix[3][3] + viewmatrix[4][3],
-	v[1]*viewmatrix[1][4] + v[2]*viewmatrix[2][4] + v[3]*viewmatrix[3][4] + 1,
-			}
-end
-
--- function mul_lookat(v)
--- 	return {
--- 	v[1]*look_at[1][1] + v[2]*look_at[2][1] + v[3]*look_at[3][1] + look_at[4][1],
--- 	v[1]*look_at[1][2] + v[2]*look_at[2][2] + v[3]*look_at[3][2] + look_at[4][2],
--- 	v[1]*look_at[1][3] + v[2]*look_at[2][3] + v[3]*look_at[3][3] + look_at[4][3]
--- 			}
--- end
-
--- function lookat(from, to)
--- 	local tmp = {0,1,0}
--- 	local f = normalize(sub_vec(from, to))
--- 	local r = (cross_product(normalize(tmp), f))
--- 	local u = (cross_product(f, r))
-
--- 	look_at[1] = {r[1], r[2], r[3]}
--- 	look_at[2] = {u[1], u[2], u[3]}
--- 	look_at[3] = {f[1], f[2], f[3]}
--- 	look_at[4] = {-from[1], -from[2], -from[3]}
-
--- end
-
-function length_vec(v)
-	return sqrt(v[1]*v[1] + v[2]*v[2] + v[3]*v[3])
-end
-
-function normalize(v)
-	local l = length_vec(v)
-	return l == 0 and {0,0,0} or 
-					  {v[1]/l,v[2]/l,v[3]/l}
-end
-
-function add_vec(v1, v2)
-	return {v1[1]+v2[1],v1[2]+v2[2],v1[3]+v2[3]}
-end
-
-function sub_vec(v1, v2)
-	return {v1[1]-v2[1],v1[2]-v2[2],v1[3]-v2[3]}
-end
-
-function mul_vec(v, a)
-	return {v[1]*a,v[2]*a,v[3]*a}
-end
-
-function dot_product(v1, v2)
-	return v1[1]*v2[1] + v1[2]*v2[2] + v1[3]*v2[3]
-end
-
-function cross_product(v1, v2)
-	return {v1[2]*v2[3] - v1[3]*v2[2],
-			v1[3]*v2[1] - v1[1]*v2[3],
-			v1[1]*v2[2] - v1[2]*v2[1]}
-end
-
-
-function rotate_shape(s,a,r,c)
-	local rotate
-
-	for t in all(s) do
-		for p=1,3 do
-			rotate_point(t[p],a,r,c)
-		end
-	end
-end
-
-function rotate_point(p,a,r,c)
-	if c then
-	  p[1]+=c[1]
-	  p[2]+=c[2]
-	  p[3]+=c[3]
-	end
-	local x,y,z=1,2,3
-
-	if 		a=="z" then x,y,z=1,2,3
-	elseif 	a=="y" then x,y,z=3,1,2
-	elseif 	a=="x" then x,y,z=2,3,1
-	end
-  -- figure out which axis we're rotating on
-  local _x = cos(r)*(p[x]) - sin(r) * (p[y]) -- calculate the new x location
-  local _y = sin(r)*(p[x]) + cos(r) * (p[y]) -- calculate the new y location
-  --local np = {} -- make new point and assign the new x and y to the correct axes
-  p[x] = _x
-  p[y] = _y
-  p[z] = p[z]
-  --return np -- return new point
-end
-
-function dist_3d(p1,p2)
-	return sqrt((p1[1]-p2[1])*(p1[1]-p2[1]) + (p1[2]-p2[2])*(p1[2]-p2[2]) + (p1[3]-p2[3])*(p1[3]-p2[3]))
-end
-
-----------------------------
--- sorting
-----------------------------
-
-function insertion_sort(a)
-	local j=0
-	for i=1,#a do
-		local e = a[i]
-		j = i-1
-
-		while j>=1 and dist_3d(e.b,cam.pos) > dist_3d(a[j].b,cam.pos) do
-			a[j+1]=a[j]
-			j-=1
-		end
-		if j ~= i-1 then
-			a[j+1] = e
-		end
-	end
-
-	return a
-end
-
-function drawing_order(obj)
-
-	for tri in all(obj) do
-
-		local _x,_y,_z = 0,0,0
-		for i=1,#tri do
-			tri[i].b={(tri[i][1][1]+tri[i][2][1]+tri[i][3][1])/3,
-					  (tri[i][1][2]+tri[i][2][2]+tri[i][3][2])/3,
-					  (tri[i][1][3]+tri[i][2][3]+tri[i][3][3])/3}
-			_x,_y,_z=_x+tri[i].b[1],_y+tri[i].b[2],_z+tri[i].b[3]
-		end
-		_x,_y,_z=_x/#tri,_y/#tri,_z/#tri
-		tri = insertion_sort(tri)
-		tri.b = {_x,_y,_z}
-	end
-
-	obj = insertion_sort(obj)
-
+	rectfill(nx-size,ny-size,
+	         nx+size-1,ny+size-1,
+	         col)
 	
 end
 
+function mergesort(l,i,j)
+	local l1,l2,lf={},{},{}
+	if i < j then
+		local m=flr((i+j)/2)
+		l1=mergesort(l,i,m)
+		l2=mergesort(l,m+1,j)
+		lf=merge(l1,l2)
+	end
+	
+	if i==j then return {l[i]} end
+	return lf
+end
+
+function merge(l1,l2)
+	local lf = {}
+	local i,j,k=1,1,1
+	
+	while i<=#l1 and j<=#l2 do
+		if l1[i] > l2[j] then
+			lf[k]=l2[j]
+			j+=1 k+=1
+		else
+			lf[k]=l1[i]
+			i+=1 k+=1		
+		end
+	end
+
+	while i<=#l1 do
+		lf[k]=l1[i]
+		i+=1 k+=1
+	end
+	while j<=#l2 do
+		lf[k]=l2[j]
+		j+=1 k+=1
+	end
+	
+	return lf
+end
+
+function _update()
+
+	if btn(0) then cama+=0.005 end
+	if btn(1) then cama-=0.005 end
+ cama+=0.005
+end
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -496,70 +221,70 @@ __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+e11111111111111ee21212121212121ee22222222222222ee24242424242424ee44444444444444ee44444444444444ee44444444444444ee44444444444444e
+11eeeeeeeeeeee1111eeeeeeeeeeee2222eeeeeeeeeeee2244eeeeeeeeeeee2244eeeeeeeeeeee4444eeeeeeeeeeee4444eeeeeeeeeeee4444eeeeeeeeeeee44
+1eeeeeeeeeeeeee12eeeeeeeeeeeeee12eeeeeeeeeeeeee22eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+1eeeeeeeeeeeeee11eeeeeeeeeeeeee22eeeeeeeeeeeeee24eeeeeeeeeeeeee24eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+1eeeeeeeeeeeeee12eeeeeeeeeeeeee12eeeeeeeeeeeeee22eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+1eeeeeeeeeeeeee11eeeeeeeeeeeeee22eeeeeeeeeeeeee24eeeeeeeeeeeeee24eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+1eeeeeeeeeeeeee12eeeeeeeeeeeeee12eeeeeeeeeeeeee22eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+1eeeeeeeeeeeeee11eeeeeeeeeeeeee22eeeeeeeeeeeeee24eeeeeeeeeeeeee24eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+1eeeeeeeeeeeeee12eeeeeeeeeeeeee12eeeeeeeeeeeeee22eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+1eeeeeeeeeeeeee11eeeeeeeeeeeeee22eeeeeeeeeeeeee24eeeeeeeeeeeeee24eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+1eeeeeeeeeeeeee12eeeeeeeeeeeeee12eeeeeeeeeeeeee22eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+1eeeeeeeeeeeeee11eeeeeeeeeeeeee22eeeeeeeeeeeeee24eeeeeeeeeeeeee24eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+1eeeeeeeeeeeeee12eeeeeeeeeeeeee12eeeeeeeeeeeeee22eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+1eeeeeeeeeeeeee11eeeeeeeeeeeeee22eeeeeeeeeeeeee24eeeeeeeeeeeeee24eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee4
+11eeeeeeeeeeee1122e1212121212e11222200000000222222200000000004444440000000000444444000000000044444400000000004444440000000000444
+e11111111111111ee12121212121212ee22200000000222ee42000000000042ee44000000000044ee440000000000411e440000000000411e44000000000044e
+e44444444444444ee44444444444444ee44444444444444ee44444444444444ee49494949494949ee99999999999999eea9a9a9a9a9a9a9eee444444444444ee
+44eeeeeeeeeeee4444eeeeeeeeeeee4444eeeeeeeeeeee4444eeeeeeeeeeee4499eeeeeeeeeeee4499eeeeeeeeeeee999aaaaaaaaaaaaaaae44222222222244e
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee99eeeeeeeeeeeeee9aaaeeeeeeeeeeaa94422222222222244
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee49eeeeeeeeeeeeee49eeeeeeeeeeeeee99aeeeeeeeeeeeeaa4222222222222224
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee99eeeeeeeeeeeeee9aaeeeeeeeeeeeea94222221111222224
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee49eeeeeeeeeeeeee49eeeeeeeeeeeeee99aeeeeeeeeeeeeaa4222211111122224
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee99eeeeeeeeeeeeee9aaeeeeeeeeeeeea94222111111112224
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee49eeeeeeeeeeeeee49eeeeeeeeeeeeee99aeeeeeeeeeeeeaa4222111001112224
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee99eeeeeeeeeeeeee9aaeeeeeeeeeeeea94222111001112224
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee49eeeeeeeeeeeeee49eeeeeeeeeeeeee99aeeeeeeeeeeeeaa4222111111112224
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee99eeeeeeeeeeeeee9aaeeeeeeeeeeeea94222211111122224
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee49eeeeeeeeeeeeee49eeeeeeeeeeeeee99aeeeeeeeeeeeeaa4222221111222224
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee99eeeeeeeeeeeeee9aaeeeeeeeeeeeea94222222222222224
+4eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee44eeeeeeeeeeeeee49eeeeeeeeeeeeee49eeeeeeeeeeeeee99aaeeeeeeeeeeaaa4422222222222244
+444000000000044444400000000004444440000000000444444000000000044444e9000000004e9999eeeeeeeeeeee99aaaaaaaaaaaaaaa9e44222222222244e
+e440000000000411e440000000000411e44000000000044ee44000000000044ee94900000000494ee99999999999999ee9a9a9a9a9a9a9aeee444444444444ee
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee00000000000000000000000000000000333333b3333333333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee00000000000000000000000000000000333333b3333b33333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333333b3bb333333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333333bb33333333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333bbbbbbbb33333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee00000000000000000000000000000000333bbbbbbbbbb3333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee00000000000000000000000000000000333bbb3333bbb3333333333333333333
+eeeeeee00eeeeeeeeeeeee00eeeeeeeeeeeee00eeeeeeeeeeeee00eeeeeeeeee00000000000000000000000000000000333bb333333bb3333333333333333333
+eeeeeee00eeeeeeeeeeeeeee0eeeeeeeeeeeeeee0eeeeeeeeeeeeeee00eeeeee00000000000000000000000000000000333bb333333bb3333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee00000000000000000000000000000000333bb333333bb3333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee00000000000000000000000000000000333bb333333bb3333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee00000000000000000000000000000000333bbb3333bbb3333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee00000000000000000000000000000000333bbbbbbbb3b3333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333bbbbbbbb33333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0000000000000000000000000000000033333b3333b333333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0000000000000000000000000000000033333333333333333333333333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333333333333333333333b333333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333333333333333333333b3333b3333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0000000000000000000000000000000033333333333333333333333b3bb33333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0000000000000000000000000000000033333333333333333333333bb3333333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0000000000000000000000000000000033333333333333333333bbbbbbbb3333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333333333333333333bbbbbbbbbb333
+eeee0eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333333333333333333bbb3333bbb333
+eee000eeeeeeeeeeeeee0eeeeeeeeeeeeeeeeeeee0eeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333333333333333333bb333333bb333
+eeee0eeee0eeeeeeeeeeeeeee0eeeeeeeeeeeeee000eeeeeeeeeeeeee0eeeeee000000000000000000000000000000003333333333333333333bb333333bb333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0eeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333333333333333333bb333333bb333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333333333333333333bb333333bb333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333333333333333333bbb3333bbb333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000000000003333333333333333333bbbbbbbb3b333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0000000000000000000000000000000033333333333333333333bbbbbbbb3333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee00000000000000000000000000000000333333333333333333333b3333b33333
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0000000000000000000000000000000033333333333333333333333333333333
 
 __gff__
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
