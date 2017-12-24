@@ -32,6 +32,10 @@ grad = { {x=1,y=1},
           {x=0,y=-1}
         }
 
+--[[
+  initialize simplexnoise
+  seed and permutation tables
+--]]
 function initnoise(seed)
 
  f2,g2=0.5*(sqrt(3)-1),
@@ -41,28 +45,27 @@ function initnoise(seed)
 		srand(seed)
 	end
 	
- for i=1,400 do
-		local to,from=flr(rnd(#p)+1),
-		              flr(rnd(#p)+1)
-		p[to],p[from]=p[from],p[to]
+ for i=1,256 do
+	 p[i]=flr(rnd(#p)+1)
 	end
 	
 	perm={}
-	permmod={}
 	
-	for i=1,512 do
-		perm[i]=p[(i%#p)+1]
-		permmod[i]=perm[i]%12
+	for i=0,511 do
+		perm[i+1]=p[band(i,255)+1]
 	end
 end
 
+--[[
+  simplex noise function
+--]]
 function simplexnoise(x,y)
 
  local n0,n1,n2
  local s=(x+y)*f2
  local i,j=flr(x+s),flr(y+s)
  local t=(i+j)*g2
- local x0,y0=x-(i-t),y-(j-y)
+ local x0,y0=x-(i-t),y-(j-t)
  
  local i1,j1
  if x0>y0 then i1=1 j1=0
@@ -70,14 +73,20 @@ function simplexnoise(x,y)
  
  local x1=x0-i1+g2
  local y1=y0-j1+g2
- local x2=x0-1+2*g2
- local y2=y0-1+2*g2
+ local x2=x0-1.0+2.0*g2
+ local y2=y0-1.0+2.0*g2
  
- local ii,jj=i%256+1,
- 												j%256+1
- local gi0=permmod[ii+perm[jj]]
- local gi1=permmod[ii+i1+perm[jj+j1]]
- local gi2=permmod[ii+1+perm[jj+1]]
+ local ii,jj=band(i,255)+1,
+ 												band(j,255)+1
+ 
+ -- just to be safe hehe
+ local id1,id2,id3=
+       clamp(ii+perm[jj],1,#perm),
+       clamp(ii+i1+perm[jj+j1],1,#perm),
+       clamp(ii+1+perm[jj+1],1,#perm)
+ local gi0=perm[id1]%12
+ local gi1=perm[id2]%12
+ local gi2=perm[id3]%12
  
  local t0=0.5-x0*x0-y0*y0
  if t0<0 then n0=0
@@ -86,7 +95,7 @@ function simplexnoise(x,y)
   n0=t0*t0*dot(grad[gi0+1].x,
                grad[gi0+1].y,
                x0,y0)
-  end
+ end
   
   local t1=0.5-x1*x1-y1*y1
   if t1<0 then n1=0
@@ -113,24 +122,127 @@ function dot(x1,y1,x2,y2)
 	return x1*x2+y1*y2
 end
 
+function clamp(val,l,h)
+ return val<l and l or (val>h and h or val)
+end
+
+
+--[[
+ runs noise function and returns
+ noise value
+ 
+ x,y=coordinates
+ it=number of iterations
+ per=persistance value
+ s=scale
+ l,h=return value range
+ 
+ return noise value
+--]]
+function noise(x,y,it,per,s,l,h)
+
+ local mamp=0
+ local amp=1
+ local freq=s
+ local noise=0
+ 
+ for i=1,it do
+  noise+=simplexnoise(x*freq,y*freq)*amp
+  mamp+=amp
+  amp*=per
+  freq*=2
+ end
+ 
+ noise /= mamp
+ noise=noise*(h-l)/2 + (h+l)/2
+ 
+ return noise
+end
+
+-----------------------
+------ !warning! ------
+--- you are entering --
+-- messy code region --
+-----------------------
+
 x=0
 y=0
 
 function _init()
 	initnoise(0)
+	cls()
 end
+
+opt={1,0.5,0.007}
+d={1,0.1,0.001}
+
+sel=1
 
 function _update()
- if btnp(5) then
- 	x=rnd()
- 	y=rnd()
+ if btnp(5) and (state==0 or state==4) then
+ 	state+=1
+ 	state=state%5
  end
+ 
+ if state==0 then
+ 	if btnp(2) then sel-=1 end
+ 	if btnp(3) then sel+=1 end
+ 	sel=sel<1 and 1 or (sel>#opt and #opt or sel)
+ 	if btn(1) then opt[sel]+=d[sel] end
+ 	if btn(0) then opt[sel]-=d[sel] end
+ end
+ opt[1]=opt[1]<1     and 1 or opt[1]
+ opt[2]=opt[2]<0.1   and 0.1 or opt[2]
+ opt[3]=opt[3]<0.001 and 0.001 or opt[3]
 end
 
+pal={1,12,3,11,7}
+state=0
+pixel = {}
+
 function _draw()
-	cls()
- print(simplexnoise(x,y) .. " "
-       .. x .. " " .. y)
+ if state==0 then
+  cls()
+ 	print("iterations",20,48,13)
+ 	print(opt[1],86,48,13)
+ 	print("persistance",20,56,13)
+ 	print(opt[2],86,56,13)
+ 	print("scale",20,64,13)
+ 	print(opt[3],86,64,13)
+ 	rectfill(116,sel*8+40,120,sel*8+40+4)
+ elseif state==1 then
+  cls()
+ 	initnoise(rnd())
+ 	state+=1
+ 	x=0
+ 	y=0
+ elseif state==2 then
+  cls()
+  print("generating!",42,52,11)
+  rectfill(32,60,64*((y*128+x)/(128*128))+32,68,12)
+  rect(32,60,96,68,13)
+  for i=1,500 do
+   local n=noise(x,y,opt[1],opt[2],opt[3],0,#pal)
+   pixel[y*128+x]=pal[flr(n)+1]
+   x+=1
+   if x>127 then
+    x=0
+    y+=1
+    if y>127 then
+     state+=1
+    end
+   end
+  end
+ elseif state==3 then
+  cls()
+  for i=0,127 do
+  	for j=0,127 do
+  	 pset(i,j,pixel[i*128+j])
+  	end
+  end
+  state+=1
+ end
+ 
 end
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
