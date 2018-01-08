@@ -4,6 +4,35 @@ __lua__
 -- simplex noise function
 -- matheus mortatti
 
+-- colors!
+c_black=0 c_dark_blue=1 c_dark_purple=2 c_dark_green=3  
+c_brown=4 c_dark_gray=5 c_light_gray=6 c_white=7
+c_red=8 c_orange=9 c_yellow=10 c_green=11       
+c_blue=12 c_indigo=13 c_pink=14 c_peach=15
+
+palette = {
+  {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+  {0, 1, 2, 3, 2, 5, 6, 7, 8, 4, 9, 11, 12, 13, 14, 9},
+  {0, 1, 1, 3, 2, 1, 13, 6, 2, 3, 4, 3, 12, 5, 4, 4},
+  {0, 0, 1, 1, 1, 1, 5, 13, 2, 2, 2, 3, 1, 1, 2, 2},
+  {0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+  {0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
+}
+
+debug = false
+
+objects   = {}
+debug_info  = {}
+                      
+cam={pos={0,0,0}, dir={0,0,-1}}
+mult=127/2
+
+light = {0, 0, 1}
+sun   = {0, 0, -500}
+
+pitch=-0.085
+yaw=0
+
 p = {151,160,137,91,90,15,
      131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
      190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
@@ -18,19 +47,93 @@ p = {151,160,137,91,90,15,
      49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,
      138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180}
 
-grad = { {x=1,y=1,z=0},
-          {x=-1,y=1,z=0},
-          {x=1,y=-1,z=0},
-          {x=-1,y=-1,z=0},
-          {x=1,y=0,z=1},
-          {x=-1,y=0,z=1},
-          {x=1,y=0,z=-1},
-          {x=-1,y=0,z=-1},
-          {x=0,y=1,z=1},
-          {x=0,y=-1,z=1},
-          {x=0,y=1,z=-1},
-          {x=0,y=-1,z=-1}
+grad = { {x=1,y=1},
+          {x=-1,y=1},
+          {x=1,y=-1},
+          {x=-1,y=-1},
+          {x=1,y=0},
+          {x=-1,y=0},
+          {x=1,y=0},
+          {x=-1,y=0},
+          {x=0,y=1},
+          {x=0,y=-1},
+          {x=0,y=1},
+          {x=0,y=-1}
         }
+
+template = {
+  init = function(t)
+
+  end,
+
+  update = function(t)
+
+  end,
+
+  draw = function(t)
+
+  end
+}
+
+water = {
+  init = function(t)
+    t.sizex,t.sizey,t.scale=10,10,10
+    t.off = 0
+    t.m = create_terrain(t.sizex,t.sizey,0)
+
+    t.col = c_blue
+  end,
+
+  update = function(t)
+    t.off-=0.1
+    t.m = create_terrain(t.sizex,t.sizey,t.off)
+  end,
+
+  draw = function(t)
+    local sizey,sizex = t.sizex,t.sizey
+    local scalex,scaley = t.scale+15,t.scale
+    for i=1,sizey do
+      for j=1,sizex do
+        if i<sizey and j<sizex then
+          local p1,p2,p3 = 
+                     {scalex*(j-sizex/2),t.m[i][j],scaley*(i-sizey/2)}, 
+                     {scalex*(j+1-sizex/2),t.m[i][j+1],scaley*(i-sizey/2)},
+                     {scalex*(j-sizex/2),t.m[i+1][j],scaley*(i+1-sizey/2)}
+          p1={p1[1]+t.pos[1],p1[2]+t.pos[2],p1[3]+t.pos[3]}
+          p2={p2[1]+t.pos[1],p2[2]+t.pos[2],p2[3]+t.pos[3]}
+          p3={p3[1]+t.pos[1],p3[2]+t.pos[2],p3[3]+t.pos[3]}
+          local x1,y1=project(p1)
+          local x2,y2=project(p2)
+          local x3,y3=project(p3)
+
+          draw_triangle({p1,p2,p3,c=t.col},true)
+          line(x1,y1,x2,y2,1)
+          line(x2,y2,x3,y3,1)
+          line(x3,y3,x1,y1,1)
+          
+        end
+
+        if i<sizey and j>1 then
+          local p1,p2,p3 = 
+                     {scalex*(j-sizex/2),t.m[i][j],scaley*(i-sizey/2)}, 
+                     {scalex*(j-1-sizex/2),t.m[i+1][j-1],scaley*(i+1-sizey/2)},
+                     {scalex*(j-sizex/2),t.m[i+1][j],scaley*(i+1-sizey/2)}
+          p1={p1[1]+t.pos[1],p1[2]+t.pos[2],p1[3]+t.pos[3]}
+          p2={p2[1]+t.pos[1],p2[2]+t.pos[2],p2[3]+t.pos[3]}
+          p3={p3[1]+t.pos[1],p3[2]+t.pos[2],p3[3]+t.pos[3]}
+          local x1,y1=project(p1)
+          local x2,y2=project(p2)
+          local x3,y3=project(p3)
+
+          draw_triangle({p3,p2,p1,c=t.col},true)
+          line(x1,y1,x2,y2,1)
+          line(x2,y2,x3,y3,1)
+          line(x3,y3,x1,y1,1)
+        end
+      end
+    end
+  end
+}
 
 --[[
   initialize simplexnoise
@@ -59,108 +162,68 @@ end
 --[[
   simplex noise function
 --]]
-function simplexnoise(x,y,z)
+function simplexnoise(x,y)
 
- local n0,n1,n2,n3
- local f3=1/3
- local g3=1/6
- local s=(x+y+z)*f3
- local i,j,k=flr(x+s),flr(y+s),flr(z+s)
- local t=(i+j+k)*g3
- local x0,y0,z0=x-(i-t),y-(j-t),z-(k-t)
+ local n0,n1,n2
+ local s=(x+y)*f2
+ local i,j=flr(x+s),flr(y+s)
+ local t=(i+j)*g2
+ local x0,y0=x-(i-t),y-(j-t)
  
- local i1,j1,k1,i2,j2,k2
- if x0>y0 then 
-  if y0>=z0 then
-    i1=1 j1=0 k1=0 i2=1 j2=1 k2=0
-  elseif x0>=z0 then
-    i1=1 j1=0 k1=0 i2=1 j2=0 k2=1
-  else
-    i1=0 j1=0 k1=1 i2=1 j2=0 k2=1
-  end
- else 
-  if y0<z0 then
-    i1=0 j1=0 k1=1 i2=0 j2=1 k2=1
-  elseif x0<z0 then
-    i1=0 j1=1 k1=0 i2=0 j2=1 k2=1
-  else
-    i1=0 j1=1 k1=0 i2=1 j2=1 k2=0
-  end
-end
+ local i1,j1
+ if x0>y0 then i1=1 j1=0
+ else i1=0 j1=1 end
  
- local x1=x0-i1+g3
- local y1=y0-j1+g3
- local z1=z0-k1+g3
- local x2=x0-i2+2.0*g3
- local y2=y0-j2+2.0*g3
- local z2=z0-k2+2.0*g3
- local x3=x0-1.0+3.0*g3
- local y3=y0-1.0+3.0*g3
- local z3=z0-1.0+3.0*g3
+ local x1=x0-i1+g2
+ local y1=y0-j1+g2
+ local x2=x0-1.0+2.0*g2
+ local y2=y0-1.0+2.0*g2
  
- local ii,jj,kk=band(i,255)+1,
- 						    band(j,255)+1,
-                band(k,255)+1
+ local ii,jj=band(i,255)+1,
+ 												band(j,255)+1
  
  -- just to be safe hehe
- local gi0=perm[clamp(ii+perm[clamp(jj+perm[kk],1,#perm)],1,#perm)]%12
- local gi1=perm[clamp(ii+i1+perm[clamp(jj+j1+perm[kk+k1],1,#perm)],1,#perm)]%12
- local gi2=perm[clamp(ii+i2+perm[clamp(jj+j2+perm[kk+k2],1,#perm)],1,#perm)]%12
- local gi3=perm[clamp(ii+1+perm[clamp(jj+1+perm[kk+1],1,#perm)],1,#perm)]%12
+ local id1,id2,id3=
+       clamp(ii+perm[jj],1,#perm),
+       clamp(ii+i1+perm[jj+j1],1,#perm),
+       clamp(ii+1+perm[jj+1],1,#perm)
+ --printh(id1 .. " " .. id2 .. " " .. id3)
+ local gi0=perm[id1]%12
+ local gi1=perm[id2]%12
+ local gi2=perm[id3]%12
  
- local t0=0.5-x0*x0-y0*y0-z0*z0
+ local t0=0.5-x0*x0-y0*y0
  if t0<0 then n0=0
  else
   t0=t0*t0
-  n0=t0*t0*dot3(grad[gi0+1].x,
-                grad[gi0+1].y,
-                grad[gi0+1].z,
-                x0,y0,z0)
+  n0=t0*t0*dot(grad[gi0+1].x,
+               grad[gi0+1].y,
+               x0,y0)
  end
   
-  local t1=0.5-x1*x1-y1*y1-z1*z1
+  local t1=0.5-x1*x1-y1*y1
   if t1<0 then n1=0
   else
   	t1=t1*t1
-  	n1=t1*t1*dot3(grad[gi1+1].x,
-                  grad[gi1+1].y,
-                  grad[gi1+1].z,
-                  x1,y1,z1)
+  	n1=t1*t1*dot(grad[gi1+1].x,
+                grad[gi1+1].y,
+                x1,y1)
   end
   
-  local t2=0.5-x2*x2-y2*y2-z2*z2
+  local t2=0.5-x2*x2-y2*y2
   if t2<0 then n2=0
   else
   	t2=t2*t2
-  	n2=t2*t2*dot3(grad[gi2+1].x,
-                  grad[gi2+1].y,
-                  grad[gi2+1].z,
-                  x2,y2,z2)
-  end
-
-  local t3=0.5-x3*x3-y3*y3-z3*z3
-  if t3<0 then n3=0
-  else
-    t3=t3*t3
-    n3=t3*t3*dot3(grad[gi3+1].x,
-                  grad[gi3+1].y,
-                  grad[gi3+1].z,
-                  x3,y3,z3)
+  	n2=t2*t2*dot(grad[gi2+1].x,
+                grad[gi2+1].y,
+                x2,y2)
   end
   
-  return 32.0*(n0+n1+n2+n3)
+  return 70*(n0+n1+n2)
 end
 
 function dot(x1,y1,x2,y2)
 	return x1*x2+y1*y2
-end
-
-function dot3(x1,y1,z1,x2,y2,z2)
-  return x1*x2+y1*y2+z1*z2
-end
-
-function clamp(val,l,h)
- return val<l and l or (val>h and h or val)
 end
 
 
@@ -176,17 +239,15 @@ end
  
  return noise value
 --]]
-function noise(x,y,z,it,per,s,l,h)
+function noise(x,y,it,per,s,l,h)
 
  local mamp=0
  local amp=1
  local freq=s
  local noise=0
- local pi=3.1415
- local width=32
  
  for i=1,it do
-  noise+=simplexnoise(y*freq,sin(x*freq*2*pi/width)/(2*pi)*width*freq,cos(x*freq*2*pi/width)/(2*pi)*width*freq)*amp
+  noise+=simplexnoise(x*freq,y*freq)*amp
   mamp+=amp
   amp*=per
   freq*=2
@@ -198,106 +259,551 @@ function noise(x,y,z,it,per,s,l,h)
  return noise
 end
 
------------------------
------- !warning! ------
---- you are entering --
--- messy code region --
------------------------
+function create_terrain(sizex, sizey, offset)
+  local matrix = {}
+  for i=1,sizey do
+    matrix[i] = {}
+    for j=1,sizex do
+      local n = noise(j,i+(offset),1,1,0.2,0,20)
+      matrix[i][j] = n
+    end
+  end
 
-x=0
-y=0
+  return matrix
+end
 
 function _init()
-	initnoise(0)
-	cls()
+  fps(cam.pos,pitch,yaw)
+  initnoise(0)
+
+  create_object(water,{-2,10,-60})
+
+  rotate_point(sun, "x", 0.125) 
+  rotate_point(light, "x", 0.125)
 end
-
-opt={1,0.5,0.007}
-d={1,0.1,0.001}
-
-sel=1
 
 function _update()
- if btnp(5) and (state==0 or state==4) then
- 	state+=1
- 	state=state%5
- end
- 
- if state==0 then
- 	if btnp(2) then sel-=1 end
- 	if btnp(3) then sel+=1 end
- 	sel=sel<1 and 1 or (sel>#opt and #opt or sel)
- 	if btn(1) then opt[sel]+=d[sel] end
- 	if btn(0) then opt[sel]-=d[sel] end
- end
- opt[1]=opt[1]<1     and 1 or opt[1]
- opt[2]=opt[2]<0.1   and 0.1 or opt[2]
- opt[3]=opt[3]<0.001 and 0.001 or opt[3]
+  foreach(objects,function(o) o.type.update(o) end)
 end
-
-pal={1,12,3,11,7}
-state=0
-pixel = {}
 
 function _draw()
- if state==0 then
+  
   cls()
- 	print("iterations",20,48,13)
- 	print(opt[1],86,48,13)
- 	print("persistance",20,56,13)
- 	print(opt[2],86,56,13)
- 	print("scale",20,64,13)
- 	print(opt[3],86,64,13)
- 	rectfill(116,sel*8+40,120,sel*8+40+4)
- elseif state==1 then
-  cls()
- 	initnoise(rnd())
- 	state+=1
- 	x=0
- 	y=0
- elseif state==2 then
-  cls()
-  print("generating!",42,52,11)
-  rectfill(32,60,64*((y*128+x)/(128*128))+32,68,12)
-  rect(32,60,96,68,13)
-  for i=1,500 do
-   local n=noise(x,y,1,opt[1],opt[2],opt[3],0,#pal)
-   pixel[y*128+x]=pal[flr(n)+1]
-   x+=1
-   if x>127 then
-    x=0
-    y+=1
-    if y>127 then
-     state+=1
-    end
-   end
+
+  local cx,cy=64,61
+  rectfill(0,0,128,128,c_pink)
+  rectfill(0,70,128,128,c_dark_purple)
+  -- fillp(0b010010100100.1)
+  -- rectfill(0,69,128,71,c_dark_purple)
+  fillp(0b0101101001011010.1)
+  rectfill(0,66,128,71,c_dark_purple)
+  fillp()
+  circfill(cx,cy,20,c_yellow)
+
+  spr(1,32,15,9,4)
+  
+  line(0,cy+0,128,cy+0,c_pink)
+  line(0,cy+2,128,cy+2,c_pink)
+  line(0,cy+4,128,cy+4,c_pink)
+  line(0,cy+7,128,cy+7,c_pink)
+  line(0,cy+11,128,cy+11,c_pink)
+  line(0,cy+15,128,cy+15,c_pink)
+
+  --rectfill(0,64,128,128,c_dark_blue)
+  foreach(objects,function(o) o.type.draw(o) end)
+
+
+  -- debug --
+  if debug then
+    draw_vec(light,{0,-1,3}, 1)
+
+    
+    -- print("x: " .. cam.pos[1], 0, 0, c_green)
+    -- print("y: " .. cam.pos[2], 0, 8, c_green)
+    -- print("z: " .. cam.pos[3], 0, 16, c_green)
+    -- print("yaw: " .. yaw, 0, 24,c_green)
+    -- print("pitch: " .. pitch, 0, 32, c_green)
+
+    local m,c=stat(0),stat(1)
+    update_debug(c,m)
+
+    print("mem: " .. m,88,0,c_green)
+    print("cpu: " .. c,88,8,c_green)
+
+    draw_debug(88,24)
   end
- elseif state==3 then
-  cls()
-  for i=0,127 do
-  	for j=0,127 do
-  	 pset(i,j,pixel[i*128+j])
-  	end
-  end
-  state+=1
- end
- 
+
 end
+
+function update_engine()
+
+end
+
+--[[
+  create a shape object with a table of triangles
+  stores on the objects variable
+
+  shape = shape defined at the beginning at the code
+  pos = position to create the object
+--]]
+function create_object(type, pos)
+  local obj = {}
+  obj.pos = pos
+  obj.type = type
+
+
+  obj.type.init(obj)
+  add(objects, obj)
+  return obj
+end
+
+--[[
+  move camera in the direction it is facing by d
+--]]
+function move_camera(d)
+
+  local dir = {cam.dir[1],cam.dir[2],cam.dir[3]}
+  local pdir = cam.dir  
+
+  rotate_point(dir,"x",pitch)
+  rotate_point(dir,"y",yaw)
+  dir=normalize(dir)
+  dir=mul_vec(dir, d)
+
+  cam.pos = add_vec(cam.pos,dir)
+  cam.dir=pdir
+
+end
+
+------------------------
+-- debug
+------------------------
+
+function update_debug(c,m)
+  if #debug_info >= 40 then
+    for i=2,#debug_info do
+      debug_info[i-1] = debug_info[i]
+    end
+    debug_info[#debug_info] = {mem=m,cpu=c}
+  else
+    add(debug_info,{mem=m,cpu=c})
+  end
+end
+
+function draw_debug(x, y)
+  local max_y=10
+  for d in all(debug_info) do
+    line(x,y,x,y-max_y*d.cpu)
+    x+=1
+  end
+end
+
+--------------------------
+-- draw functions
+--------------------------
+
+--[[
+  draw vector as a line and a circle 
+  that shows it's direction
+
+  v = vector
+  p = point to start drawing
+  s = size of the vector
+  c = color
+--]]
+function draw_vec(v,p,s,c)
+  v = normalize(v)
+  local p1,p2 = 
+      mul_view(p),
+      mul_view(add_vec(p, mul_vec(v,s or 1)))
+  local n1,n2 = project(p1)
+  local n3,n4 = project(p2)
+
+  if p1[3] < -0.1 and p2[3] < -0.1 then
+    line(n1,n2,n3,n4, c or c_green)
+
+    circfill(n3,n4, -10/p2[3], c or c_green)
+  end
+end
+
+--[[
+  draw triangle
+
+  t = triangle
+  fill = true to fill the triangle, false to draw lines only
+--]]
+  function draw_triangle(t, fill)
+  -- local t1,t2,t3=mul_view(t[1]),
+  --              mul_view(t[2]),
+  --              mul_view(t[3])
+  local x1,y1=project(t[1])
+  local x2,y2=project(t[2])
+  local x3,y3=project(t[3])
+  
+  if t[1][3] < -0.1 and t[2][3] < -0.1 and t[3][3] < -0.1 then    
+    if fill == true then
+      local c = t.c--calculate_light(t, light, t.c)
+      fill_tri(x1,y1,x2,y2,x3,y3,c)
+    else
+      local c = t.c--calculate_light(t, light, t.c)
+      line(x1,y1,x2,y2,c)
+      line(x2,y2,x3,y3,c)
+      line(x3,y3,x1,y1,c)
+    end
+          
+  end
+end
+
+--[[
+  calculate the color to draw a triangle
+  based on the angle between the triangle normal
+  and a vector l
+
+  t = triangle
+  l = "light"
+
+  return = new color
+--]]
+function calculate_light(t, l)
+  local v1,v2 = sub_vec(t[2], t[1]),sub_vec(t[3], t[1])
+  local n = normalize(cross_product(v1, v2))
+  local nl = normalize({-l[1], -l[2], -l[3]})
+  local angle = dot_product(nl,n)
+
+  angle += 1
+  angle /= 2
+  angle = abs(angle)
+
+  return palette[#palette - flr((#palette-1)*angle)][t.c+1];
+end
+
+
+--[[
+  calculate the actual color to draw based on a normal,
+  a vector (as light source) and the color intended.
+
+  n = normal
+  l = light
+  c = color
+
+  return = new color
+--]]
+function calculate_light_n(n, l, c)
+  local nl = normalize({-l[1], -l[2], -l[3]})
+  local angle = dot_product(nl,n) / (length_vec(n) * length_vec(nl))
+  
+  angle += 1
+  angle /= 2
+  angle = abs(angle)
+  return palette[#palette - flr((#palette-1)*angle)][c+1];
+end
+
+--[[
+  draw a line on the screen based on 3d points
+
+  p1,p2 = 3d points
+  c     = color
+--]]
+function draw_line(p1,p2,c)
+  local x1,y1=project(p1)
+  local x2,y2=project(p2)
+  line(x1,y1,x2,y2,c or 11)
+end
+
+
+--[[
+  project 3d points to screen coordinates
+
+  p = 3d points (x,y,z)
+
+  return = screen coordinate x and y
+--]]
+function project(p)
+  local x=abs(p[3])<=0.1 and u or -mult*(p[1])/(p[3])+127/2
+  local y=abs(p[3])<=0.1 and 0 or -mult*(p[2])/(p[3])+127/2
+  return x,y
+end
+
+--[[
+  rasterize a triangle based on 3 2d points on the screen
+
+  x1,y2
+  x2,y2
+  x3,y3 = 2d points
+
+  c = color
+--]]
+function fill_tri(x1,y1,x2,y2,x3,y3,c)
+  if y1>y2 then y1,y2=y2,y1 x1,x2=x2,x1 end
+  if y2>y3 then y2,y3=y3,y2 x2,x3=x3,x2 end
+  if y1>y2 then y1,y2=y2,y1 x1,x2=x2,x1 end
+  if y2>y3 then y2,y3=y3,y2 x2,x3=x3,x2 end
+
+
+  if y1==y2 and y2==y3 then line(x2,y2,x3,y3,c or 8) return end
+
+  if y1==y2 then
+    fill_top_tri(x1,y1,x2,y2,x3,y3,c)
+  elseif y2==y3 then
+    fill_bottom_tri(x1,y1,x2,y2,x3,y3,c)
+  else
+    local x4,y4=x1+((y2-y1)/(y3-y1))*(x3-x1),y2
+    line(x2,y2,x4,y4,c or 8)
+    fill_bottom_tri(x1,y1,x2,y2,x4,y4,c)
+    fill_top_tri(x2,y2,x4,y4,x3,y3,c)
+  end 
+end
+
+--------------------------
+-- helper functions
+-- for fill_tri
+--------------------------
+
+function fill_bottom_tri(x1,y1,x2,y2,x3,y3,c,p)
+  local inv1=(x2-x1)/(y2-y1)
+  local inv2=(x3-x1)/(y3-y1)
+  local cx1=x1
+  local cx2=x1
+  
+  for i=y1,y2 do
+    line(cx1,i,cx2,i,c or 8)
+    cx1+=inv1
+    cx2+=inv2
+  end
+end
+
+function fill_top_tri(x1,y1,x2,y2,x3,y3,c,p)
+  local inv1=(x3-x1)/(y3-y1)
+  local inv2=(x3-x2)/(y3-y2)
+  local cx1=x3
+  local cx2=x3
+  
+  for i=y3,y1,-1 do
+    line(cx1,i,cx2,i,c or 8)
+    cx1-=inv1
+    cx2-=inv2
+  end
+end
+
+
+-------------------------
+-- linear algebra
+-------------------------
+
+
+--[[
+  calculate fps camera
+
+  eye   = camera position
+  pitch   = angle of camera around x axis
+  yaw   = angle of camera around y axis
+
+  returns = nothing, changes global value of viewmatrix
+--]]
+function fps(eye,pitch,yaw)
+  local cosp,sinp,cosy,siny=
+      cos(pitch),sin(pitch),
+      cos(yaw),sin(yaw)
+
+  local x,y,z = {cosy,0,-siny},
+          {siny*sinp,cosp,cosy*sinp},
+          {siny*cosp,-sinp,cosp*cosy}
+
+  viewmatrix = {
+    {x[1],y[1],z[1],0},
+    {x[2],y[2],z[2],0},
+    {x[3],y[3],z[3],0},
+    {-dot_product(x,eye),-dot_product(y,eye),-dot_product(z,eye),1}}
+end
+
+
+--[[
+  multiply a vector(or position) with the view matrix
+  to get a new position in the camera space
+
+  return = new vector multiplied by the view matrix
+--]]
+function mul_view(v)
+  return {
+  v[1]*viewmatrix[1][1] + v[2]*viewmatrix[2][1] + v[3]*viewmatrix[3][1] + viewmatrix[4][1],
+  v[1]*viewmatrix[1][2] + v[2]*viewmatrix[2][2] + v[3]*viewmatrix[3][2] + viewmatrix[4][2],
+  v[1]*viewmatrix[1][3] + v[2]*viewmatrix[2][3] + v[3]*viewmatrix[3][3] + viewmatrix[4][3],
+  v[1]*viewmatrix[1][4] + v[2]*viewmatrix[2][4] + v[3]*viewmatrix[3][4] + viewmatrix[4][4],
+      }
+end
+
+function length_vec(v)
+  return sqrt(v[1]*v[1] + v[2]*v[2] + v[3]*v[3])
+end
+
+function normalize(v)
+  local l = length_vec(v)
+  return l == 0 and {0,0,0} or 
+            {v[1]/l,v[2]/l,v[3]/l}
+end
+
+function add_vec(v1, v2)
+  return {v1[1]+v2[1],v1[2]+v2[2],v1[3]+v2[3]}
+end
+
+function sub_vec(v1, v2)
+  return {v1[1]-v2[1],v1[2]-v2[2],v1[3]-v2[3]}
+end
+
+function mul_vec(v, a)
+  return {v[1]*a,v[2]*a,v[3]*a}
+end
+
+function dot_product(v1, v2)
+  return v1[1]*v2[1] + v1[2]*v2[2] + v1[3]*v2[3]
+end
+
+function cross_product(v1, v2)
+  return {v1[2]*v2[3] - v1[3]*v2[2],
+      v1[3]*v2[1] - v1[1]*v2[3],
+      v1[1]*v2[2] - v1[2]*v2[1]}
+end
+
+--[[
+  rotate a shape (collection of triangles) around itself
+  (if c is given, rotates around it)
+
+  s = shape
+  a = axis ("x", "y", "z") as a string
+  r = how much to rotate
+  c = center (nil if rotation is around the shape itself)
+--]]
+function rotate_shape(s,a,r,c)
+  local rotate
+
+  for t in all(s.triangles) do
+    for p=1,3 do
+      rotate_point(t[p],a,r,c and sub_vec(c,s.pos))
+    end
+  end
+end
+
+--[[
+  rotate a point around itself
+  (if c is given, rotates around it)
+
+  p = point
+  a = axis ("x", "y", "z") as a string
+  r = how much to rotate
+  c = center (nil if rotation is around the shape itself)
+
+  return = nothing, changes point by reference
+--]]
+function rotate_point(p,a,r,c)
+  if c then
+    p[1]-=c[1]
+    p[2]-=c[2]
+    p[3]-=c[3]
+  end
+  local x,y,z=1,2,3
+
+  if    a=="z" then x,y,z=1,2,3
+  elseif  a=="y" then x,y,z=3,1,2
+  elseif  a=="x" then x,y,z=2,3,1
+  end
+  -- figure out which axis we're rotating on
+  local _x = cos(r)*(p[x]) - sin(r) * (p[y]) -- calculate the new x location
+  local _y = sin(r)*(p[x]) + cos(r) * (p[y]) -- calculate the new y location
+
+  p[x] = _x
+  p[y] = _y
+  p[z] = p[z]
+
+  if c then
+    p[1]+=c[1]
+    p[2]+=c[2]
+    p[3]+=c[3]
+  end
+end
+
+
+--[[
+  calculates 3d distance between 2 points
+
+  o1,p2 = 3d points
+
+  return = 3d distance
+--]]
+function dist_3d(p1,p2)
+  return sqrt((p1[1]-p2[1])*(p1[1]-p2[1]) + (p1[2]-p2[2])*(p1[2]-p2[2]) + (p1[3]-p2[3])*(p1[3]-p2[3]))
+end
+
+----------------------------
+-- sorting
+----------------------------
+
+function insertion_sort(a)
+  local j=0
+  for i=1,#a do
+    local e = a[i]
+    j = i-1
+
+    while j>=1 and dist_3d(e.b,cam.pos) > dist_3d(a[j].b,cam.pos) do
+      a[j+1]=a[j]
+      j-=1
+    end
+    if j ~= i-1 then
+      a[j+1] = e
+    end
+  end
+
+  return a
+end
+
+function drawing_order(objects)
+
+  for obj in all(objects) do
+    local tri = obj.triangles
+    local _x,_y,_z = 0,0,0    
+    for i=1,#tri do
+      tri[i].b={(tri[i][1][1]+tri[i][2][1]+tri[i][3][1]+3*obj.pos[1])/3,
+            (tri[i][1][2]+tri[i][2][2]+tri[i][3][2]+3*obj.pos[2])/3,
+            (tri[i][1][3]+tri[i][2][3]+tri[i][3][3]+3*obj.pos[3])/3}
+      _x,_y,_z=_x+tri[i].b[1],_y+tri[i].b[2],_z+tri[i].b[3]
+    end
+    _x,_y,_z=_x/#tri,_y/#tri,_z/#tri    
+    tri = insertion_sort(tri)
+    obj.b = {_x,_y,_z}
+  end
+
+  objects = insertion_sort(objects)
+end
+
+function clamp_wrap(low, hi, val)
+  while val < low do val = hi - (low-val) end
+  while val > hi  do val = low + (val-hi) end
+
+  return val
+end
+
+function clamp(val, low, hi)
+  return (val < low) and low or (val > hi and hi or val)
+end
+
+function fraq(x)
+  return x-flr(abs(x))
+end
+
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700000000d00000000d00d00000000000000000000000000000000000000000d00000000000000000000000000000000000000000000000000000000000
+0007700000ddddddddd00dddddd0ddd000000000d000000000000d00000000dddd00dddd00000000000000000000000000000000000000000000000000000000
+00077000000000000000000d0d00d00d00000000d0000000ddddddddddd000d00d00d00d00000000000000000000000000000000000000000000000000000000
+00700700000ddddddd000dddddd0d00d00000000d0000000d000000000d000d00d0dd00d00000000000000000000000000000000000000000000000000000000
+00000000000d00000d00000dd000d00d000ddddddddddd0000dddddd000000ddddd00dd000000000000000000000000000000000000000000000000000000000
+00000000000ddddddd0000dddd00d0d000000000d000000000000000d0000000d0000dd000000000000000000000000000000000000000000000000000000000
+00000000000d00d00d00ddd00d00d00d00000000d0000000000000dd000000d0d000d00d00000000000000000000000000000000000000000000000000000000
+00000000000000d0000000dddd00d000d0000000d000000000000d00000000d0dddd0000d0000000000000000000000000000000000000000000000000000000
+000000000000d0d0d00000d00d00d000d0000000d0000000ddddddddddd000d0d000dddd00000000000000000000000000000000000000000000000000000000
+00000000000d00d00d0000dddd00d0dd00000000d000000000000d00000000d0d0d0d00d00000000000000000000000000000000000000000000000000000000
+0000000000000dd0000000d00d00d00000000000d000000000000d00000000dddd00dddd00000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000dd00000000d00000d00d00000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
