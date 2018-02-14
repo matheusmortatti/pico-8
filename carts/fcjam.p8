@@ -13,7 +13,6 @@ function deep_copy(obj)
 end
 
 
-
 -- creates a new object by calling obj = object:extend()
 object={}
 function object:extend(kob)
@@ -142,12 +141,12 @@ entity=object:extend(
 
 enemy=entity:extend({
   state="nothing",
-  collides_with={"player"},
+  collides_with={"player","enemy"},
   tags={"enemy"}
 })
 
 function enemy:collide(e)
-  return c_move_out
+  return c_push_out
 end
 
 -------------------------------
@@ -258,7 +257,96 @@ function do_movement()
     end
 end
 
+-------------
+-- Buckets
+-------------
+
+c_bucket = {}
+
+function bkt_pos(e)
+  local x,y=e.pos.x,e.pos.y
+  return flr(shr(x,4)),flr(shr(y,4))
+end
+
+-- Add entity to all the indexes
+-- it belongs in the bucket
+function bkt_insert(e)
+  local x,y=bkt_pos(e)
+  for t in all(e.tags) do
+    local b=bkt_get(t,x,y)
+    add(b,e)
+  end
+
+  e.bkt=v(x,y)
+end
+
+function bkt_remove(e)
+  local x,y=e.bkt.x,e.bkt.y
+  for t in all(e.tags) do
+    local b=bkt_get(t,x,y)
+    del(b,e)
+  end
+end
+
+function bkt_get(t,x,y)
+  local ind=t..":"..x..","..y
+  if not c_bucket[ind] then
+    c_bucket[ind]={}
+  end
+  return c_bucket[ind]
+end
+
+function bkt_update()  
+  for t,v in pairs(entities) do       
+      for e in all(v) do
+        bkt_update_entity(e)
+      end
+    end
+end
+
+function bkt_update_entity(e)
+  if not e.pos or not e.tags then return end
+  local bx,by=bkt_pos(e)
+  if not e.bkt or e.bkt.x~=bx or e.bkt.x~=by then
+    if not e.bkt then
+      bkt_insert(e)
+    else
+      bkt_remove(e)
+      bkt_insert(e)
+    end
+  end
+end
+
+-- iterator that goes over
+-- all entities with tag "tag"
+-- that can potentially collide
+-- with "e" - uses the bucket
+-- structure described earlier.
+function c_potentials(e,tag)
+ local cx,cy=bkt_pos(e)
+ local bx,by=cx-2,cy-1
+ local bkt,nbkt,bi={},0,1
+ return function()
+  -- ran out of current bucket,
+  -- find next non-empty one
+  while bi>nbkt do
+   bx+=1
+   if (bx>cx+1) bx,by=cx-1,by+1
+   if (by>cy+1) return nil
+   bkt=bkt_get(tag,bx,by)
+   nbkt,bi=#bkt,1
+  end
+  -- return next entity in
+  -- current bucket and
+  -- increment index
+  local e=bkt[bi]
+  bi+=1
+  return e
+ end 
+end
+
 function do_collisions()
+    bkt_update()
   	for t,v in pairs(entities) do       
       for e in all(v) do
         collide(e)
@@ -278,7 +366,8 @@ function collide(e)
   -- Entity Collision
   -------------------------
   for tag in all(e.collides_with) do
-    for o in all(entities[tag]) do
+    --local bc=bkt_get(tag,e.bkt.x,e.bkt.y)
+    for o in c_potentials(e,tag) do --all(entities[tag]) do
       -- create an object that holds the entity
       -- and the hitbox in the right position
       local oc={}
@@ -301,6 +390,10 @@ function collide(e)
   -------------------------
   -- Tile Collision
   -------------------------
+
+  -- Do not collide if it's not set to
+  if (not e.c_tile) return
+
   local pos=tile_flag_at(ec.b, 1)
 
   for p in all(pos) do
@@ -419,24 +512,19 @@ function spr_render(e)
   spr(e.sprite, e.pos.x, e.pos.y)
 end
 
-
-
 function _init()
   e_add(player({
     state="idle",
-    sprite=1,pos=v(56,64),
-    hitbox=box(0,0,8,8)
-  }))
-
-  e_add(enemy({
-    sprite=1,pos=v(72,64),
+    sprite=1,pos=v(56,10),
     hitbox=box(0,0,8,8),
+    c_tile=true
   }))
 
   e_add(enemy({
     sprite=1,pos=v(64,64),
     hitbox=box(0,0,8,8),
-  }))
+    c_tile=true
+  }))  
 end
 
 function _update60()    
@@ -447,6 +535,7 @@ end
 
 function _draw()
   cls()
+  print("cpu: " .. stat(1) .. " mem: " .. stat(0))
   map(0, 0, 0, 0, 16, 16)
   e_draw_all()
 end
