@@ -13,7 +13,6 @@ function deep_copy(obj)
  end
  return cpy
 end
-
 function shallow_copy(obj)
   if (type(obj)~="table") return obj
  local cpy={} 
@@ -152,6 +151,17 @@ function entity:spawns_from(...)
   end
 end
 
+function entity:draw_dit(ct,ft,flip)
+  draw_dithered(
+      ct/ft,
+      flip,
+      box(self.pos.x+self.hitbox.xl,
+      self.pos.y+self.hitbox.yt,
+      self.pos.x+self.hitbox.xr,
+      self.pos.y+self.hitbox.yb)
+      )
+end
+
 
 -------------------------------
 -- collision boxes
@@ -219,10 +229,6 @@ function box(xl,yt,xr,yb)
   yt=min(yt,yb),yb=max(yt,yb)
  })
 end
--- makes a box from two corners
-function vbox(v1,v2)
- return box(v1.x,v1.y,v2.x,v2.y)
-end
 
 -------------------------------
 -- entity: dynamic
@@ -261,8 +267,8 @@ end
 enemy=dynamic:extend({
   collides_with={"player"},
   tags={"enemy"},
-  c_tile=true,
-  hitbox=box(0,0,7,7),
+  hitbox=box(0,0,8,8),
+  c_tile=true,  
   inv_t=30,
   ht=0,
   hit=false,
@@ -300,14 +306,14 @@ function enemy:dead()
   end
 end
 
-function enemy:damage()
+function enemy:damage(s)
   if not self.hit then
     self.health-=1
-    add_time(self.give)
-
+    s=s or 1
+    add_time(self.give*s)
     p_add(ptext({
       pos=v(self.pos.x-10,self.pos.y),
-      txt="+"..self.give,
+      txt="+"..self.give*s,
       lifetime=45
       }))
     self.hit=true
@@ -322,9 +328,10 @@ function enemy:collide(e)
   if (self.state=="dead") return
   if e:is_a("player") and e.damage then
     if e:damage() then
-      local d=v(e.pos.x-self.pos.x,e.pos.y-e.pos.y)
+      local d=v(e.pos.x-self.pos.x,e.pos.y-self.pos.y)
       if #d>0.01 then d=d:norm() end
       e.vel=d*3
+      add_time(-self.take)
     end
   end
 end
@@ -336,14 +343,7 @@ function enemy:render()
   spr(s,self.pos.x,self.pos.y)
 
   if self.state=="dead" then
-    draw_dithered(
-      self.t/self.death_time,
-      true,
-      box(self.pos.x+self.hitbox.xl,
-      self.pos.y+self.hitbox.yt,
-      self.pos.x+self.hitbox.xr,
-      self.pos.y+self.hitbox.yb)
-      )
+    self:draw_dit(self.t, self.death_time, true)
   end
 end
 
@@ -364,6 +364,8 @@ blob:spawns_from(7)
 
 function blob:init()
   self.fric=0.05
+  self.ssize=3
+  self.svel=0.15
 end
 
 function blob:moving()
@@ -377,26 +379,8 @@ function blob:moving()
   self:set_vel()
 end
 
-function blob:render()
-  if (self.hit and self.t%3==0) return
-  local s=self.sprite
-  s+=(self.t*0.15)%3
-  spr(s,self.pos.x,self.pos.y)
-
-  if self.state=="dead" then
-    draw_dithered(
-      self.t/self.death_time,
-      true,
-      box(self.pos.x+self.hitbox.xl,
-      self.pos.y+self.hitbox.yt,
-      self.pos.x+self.hitbox.xr,
-      self.pos.y+self.hitbox.yb)
-      )
-  end
-end
-
 -------------------------------
--- entity: blob
+-- entity: spike
 -------------------------------
 
 spike=entity:extend({
@@ -407,14 +391,24 @@ spike=entity:extend({
   draw_order=1
 })
 
-spike:spawns_from(115)
+spike:spawns_from(115, 116)
+
+function spike:init()
+  if(self.sprite==116)self:become("second")
+  self.mode=self.sprite==115 and 0 or 1
+  self.sprite=115
+end
 
 function spike:first()
-  if (self.t > self.time) self:become("second")
+  if (self.t > self.time)self:become("second")
 end
 
 function spike:second()
-  if (self.t > self.time) self:become("third")
+  local s,p=c_get_entity(self),c_get_entity(scene_player)
+  if (self.t > self.time and self.mode==0) or 
+     (self.active and not p.b:overlaps(s.b) and self.mode==1) then
+    self:become("third")
+  end
 end
 
 function spike:third()
@@ -422,66 +416,31 @@ function spike:third()
     for i=1,8 do
       local s=smoke({
         pos=v(self.pos.x+4+rnd(8)-4,self.pos.y+4+rnd(8)-4),
-        vel=v(rnd(0.5)-0.25,-(rnd(1)+0.5))
-        })
-      s.r=rnd(0.7)+0.5
+        vel=v(rnd(0.5)-0.25,-(rnd(1)+0.5)),
+        r=rnd(0.7)+0.5
+        })      
       e_add(s)
     end
     shake+=1
   end
-  if (self.t > self.time) self:become("first")
+  if (self.t > self.time and self.mode==0) self:become("first")
 end
 
 function spike:render()
-  if self.state=="second" then
-    spr(self.sprite,self.pos.x,self.pos.y)
-  elseif self.state=="third" then
-    spr(self.sprite+1,self.pos.x,self.pos.y)
-  end
+  if (self.state=="second")spr(self.sprite,self.pos.x,self.pos.y)
+  if (self.state=="third" )spr(self.sprite+1,self.pos.x,self.pos.y)
 end
 
 function spike:collide(e)
-  if self.state=="third" and e:is_a("player") and e.damage then
+  if self.state=="third" then
     if e:damage() then
-      local d=v(e.pos.x-self.pos.x,e.pos.y-e.pos.y)
+      local d=v(e.pos.x-self.pos.x,e.pos.y-self.pos.y)
       if #d>0.001 then d=d:norm() end
       e.vel=d*3
     end
+  elseif self.mode==1 then
+    self.active = true
   end
-end
-
--------------------------------
--- entity: time eater
--------------------------------
-
-time_eater=enemy:extend(
-  {
-    state="idle",
-    idle_time=60
-  }
-)
-time_eater:spawns_from(1)
-
-function time_eater:eating()
-  add_time(-self.take)
-  p_add(ptext({
-      pos=v(self.pos.x-10,self.pos.y-4),
-      txt="-"..self.take,
-      lifetime=30,
-      c=8
-    }))
-
-  for i=1,4 do
-    e_add(smoke({
-        pos=v(self.pos.x+4+rnd(2)-1,self.pos.y+rnd(2)-1),      
-        c=rnd(1)<0.5 and 7 or 9}))
-  end
-  shake+=2
-  self:become("idle")
-end
-
-function time_eater:idle()
-  if (self.t > self.idle_time) self:become("eating")
 end
 
 -------------------------------
@@ -496,7 +455,8 @@ laserdude=enemy:extend(
     health=4,
     give=4,
     take=2,
-    fric=0.07
+    fric=0.07,
+    r=5
   }
 )
 
@@ -504,37 +464,25 @@ laserdude:spawns_from(10)
 
 function laserdude:shooting()
   self.vel=v(0,0)
-  
-  if self.t%6 == 0 then
-    e_add(bullet({
-        dir=v(-1,0),
-        pos=v(self.pos.x+self.hitbox.xl-8,
-                self.pos.y),
-        vel=v(0,0)
-      }))
 
-    e_add(bullet({
-        dir=v(1,0),
-        pos=v(self.pos.x+self.hitbox.xr+8,
-                self.pos.y),
-        vel=v(0,0)
-      }))
-
-    e_add(bullet({
-        dir=v(0,-1),
-        pos=v(self.pos.x,
-                self.pos.y+self.hitbox.yt-8),
-        vel=v(0,0)
-      }))
-
-    e_add(bullet({
-        dir=v(0,1),
-        pos=v(self.pos.x,
-                self.pos.y+self.hitbox.yb+8),
-        vel=v(0,0)
-      }))
+  local llength=5
+  if self.t==10 then
+    shake+=5
+    for i=0,llength-1 do
+      local l=laser({dir=v(0,-1),pos=v(self.pos.x-self.r+1,self.pos.y-self.r-i*8)})
+      l.lifetime=10+i
+      e_add(l)
+      l=laser({dir=v(0,1),pos=v(self.pos.x-self.r+1,self.pos.y+self.r+i*8)})
+      l.lifetime=10+i
+      e_add(l)
+      l=laser({dir=v(1,0),pos=v(self.pos.x+self.r+i*8,self.pos.y-self.r+1)})
+      l.lifetime=10+i
+      e_add(l)
+      l=laser({dir=v(-1,0),pos=v(self.pos.x-self.r-i*8,self.pos.y-self.r+1)})
+      l.lifetime=10+i
+      e_add(l)
+    end
   end
-
   if self.t > 30 then
     self:become("wondering")
   end
@@ -544,7 +492,6 @@ function laserdude:wondering()
   local wonder_time=60
   if self.t > wonder_time and not self.hit then
     self:become("shooting")
-    self.dir=v(0,0)    
   end
 
   if self.t == 1 then
@@ -556,19 +503,61 @@ end
 
 function laserdude:render()
   if self.hit and self.t%3==0 then return end
-  circ(self.pos.x,self.pos.y,5,9)
+  circ(self.pos.x,self.pos.y,self.r,9)
   print("\130",self.pos.x-3,self.pos.y-2,9)
 
-
   if self.state=="dead" then
-    draw_dithered(
-      self.t/self.death_time,
-      true,
-      box(self.pos.x+self.hitbox.xl-1,
-      self.pos.y+self.hitbox.yt-1,
-      self.pos.x+self.hitbox.xr+1,
-      self.pos.y+self.hitbox.yb+1)
-      )
+    self:draw_dit(self.t,self.death_time,true)
+  end
+end
+
+laser=entity:extend(
+  {
+    hitbox=box(0,0,8,8),
+    give=4,
+    take=2,
+    dir=v(1,0),
+    collides_with={"player","oldman"},
+    c_tile=false
+  }
+)
+
+function laser:init()
+  if (not self.lifetime) self.lifetime=10
+  self.hitbox=box(0,0,8,8)
+
+  if self.dir.x<0 then
+    self.hitbox.xl=-8
+    self.hitbox.xr=0
+  end
+
+  if self.dir.y<0 then
+    self.hitbox.yt=-8
+    self.hitbox.yb=0
+  end
+
+  if self.dir.x~=0 then
+    self.hitbox.yt=3
+    self.hitbox.yb=5
+  end
+
+  if self.dir.y~=0 then
+    self.hitbox.xl=3
+    self.hitbox.xr=5
+  end
+end
+
+function laser:update()
+  if (self.t>self.lifetime) self.done=true
+end
+
+laser.collide=enemy.collide
+
+function laser:render()
+  rectfill(self.hitbox.xl+self.pos.x,self.hitbox.yt+self.pos.y,
+           self.hitbox.xr+self.pos.x,self.hitbox.yb+self.pos.y,9)
+  if self.t >= 3*self.lifetime/4 then
+    self:draw_dit((self.lifetime-self.t),(self.lifetime/4),false)    
   end
 end
 
@@ -601,8 +590,8 @@ function bullet:update()
     p_add(s)
   end
 
-  self.pos.x+= self.dir.y*sin(self.t/5 + self.wo)
-  self.pos.y+= self.dir.x*sin(self.t/5 + self.wo)
+  -- self.pos.x+= self.dir.y*sin(self.t/5 + self.wo)
+  -- self.pos.y+= self.dir.x*sin(self.t/5 + self.wo)
 
   if (self.t > self.lifetime) self.done=true
 end
@@ -645,50 +634,41 @@ end
 
 oldman=enemy:extend({
   state="idle",
+  tags={"oldman"},
   vel=v(0,0),
-  hitbox=box(1,3,7,8),
-  maxvel=0.5
+  hitbox=box(0,1,8,8),
+  maxvel=0.5,
+  ssize=3,
+  svel=0.1,
+  draw_order=2
 })
 
-oldman:spawns_from(16)
+oldman:spawns_from(1)
 
 function oldman:init()
   self.thinkchar="\138"
+  self.sprite=0
+  self.dial=nil
 end
 
 function oldman:idle()
   self:set_vel()
 
-  if rnd(1)<0.05 then
-    p_add(ptext(
-      {
-        pos=v(self.pos.x-4,self.pos.y-4),
-        vh=true,
-        txt=self.thinkchar
-      }
-    ))
+  if (not scene_player) return
+  local ec,oc=c_get_entity({pos=self.pos,hitbox=box(-8,-8,16,16)}),c_get_entity(scene_player)
+  if ec.b:overlaps(oc.b) then
+    if not self.dial then
+      self.dial=dialog({pos=self.pos+v(0,-6),text="if i lose one more second i'll die!"})
+      e_add(self.dial)
+    end
+  else
+    if (self.dial)self.dial:destroy()
+    self.dial=nil
   end
 end
 
 function oldman:collide(e)
-  return c_push_out
-end
-
-function oldman:render()  
-  local s=self.sprite
-  s+=(self.t*0.1)%3
-  spr(s,self.pos.x,self.pos.y)
-  
-  if self.state=="dead" then
-    draw_dithered(
-      self.t/self.death_time,
-      true,
-      box(self.pos.x+self.hitbox.xl-1,
-      self.pos.y+self.hitbox.yt-1,
-      self.pos.x+self.hitbox.xr+1,
-      self.pos.y+self.hitbox.yb+1)
-      )
-  end
+ return c_push_out
 end
 
 -------------------------------
@@ -697,16 +677,19 @@ end
 
 player=dynamic:extend({
   state="walking", vel=v(0,0),
-  collides_with={"enemy"},
+  collides_with={"slowdown"},
   tags={"player"}, dir=v(1,0),
-  hitbox=box(2,2,6,7),
+  hitbox=box(2,3,6,8),
   c_tile=true,
   sprite=0,
   draw_order=3,
   fric=0.5,
   inv_t=30,
   ht=0,
-  hit=false
+  hit=false,
+  dmg=1,
+  has_swrd=false,
+  basevel=1
 })
 
 player:spawns_from(32)
@@ -747,9 +730,10 @@ function player:walking()
 
   if (self.dir~=v(0,0)) self.last_dir=v(self.dir.x,self.dir.y)
 
-  if btnp(5) then 
+  if btnp(4) then 
     self:become("attacking")
-  end  
+  end
+  self.maxvel = self.basevel
 end
 
 function player:attacking()
@@ -758,10 +742,12 @@ function player:attacking()
     self.attk=sword_attack(
       {
         pos=self.pos+dir*8,
-        facing=dir
+        facing=dir,
+        upg=self.has_swrd
       }
     )
-    e_add(self.attk)
+    self.attk.dmg=self.dmg
+    e_add(self.attk)    
   end
 
   self.vel=v(0,0)
@@ -800,7 +786,9 @@ function player:damage()
 end
 
 function player:collide(e)
-  
+  if e:is_a("slowdown") then
+    self.maxvel=self.basevel/2
+  end
 end
 
 -------------------------------
@@ -814,10 +802,24 @@ sword_attack=entity:extend(
     tags={"attack"},
     collides_with={"enemy"},
     facing=v(1,0),
+    dmg=1,
     sprite=3,
     draw_order=5
   }
 )
+
+function sword_attack:init()
+  if self.upg then
+    for i=1,4 do
+      e_add(smoke({
+            pos=v(self.pos.x+rnd(8),self.pos.y+rnd(8)),
+            vel=v(rnd(0.5)-0.25,-(rnd(1)+0.5)),
+            c=rnd(1)<0.7 and 12 or 7,
+            v=0.15
+        }))
+    end
+  end
+end
 
 function sword_attack:update()
   self.flipx=self.facing.x==-1
@@ -835,22 +837,14 @@ function sword_attack:render()
   local nf=v(abs(self.facing.y),abs(self.facing.x))
   local off=v(abs(self.facing.x),abs(self.facing.y))*4+v(4,4)
   local pos=self.pos+nf*2
-  if self.t <= self.lifetime/4 then
-    draw_dithered(self.t/(self.lifetime/4))
-    rectfill(pos.x,pos.y,pos.x+off.x,pos.y+off.y,0)
-    fillp()
-  end
-
   if self.t >= 3*self.lifetime/4 then
-    draw_dithered((self.lifetime-self.t)/(self.lifetime/4))
-    rectfill(pos.x,pos.y,pos.x+off.x,pos.y+off.y,0)
-    fillp()
+    self:draw_dit((self.lifetime-self.t),(self.lifetime/4))    
   end
 end
 
 function sword_attack:collide(e)
   if e:is_a("enemy") and not e.hit then
-    e:damage()
+    e:damage(self.dmg)
     local allowed_dirs={
       v(-1,0)==self.facing,
       v(1,0)==self.facing,
@@ -862,12 +856,182 @@ function sword_attack:collide(e)
 end
 
 -------------------------------
+-- entity: sword upgrade
+-------------------------------
+
+sword_upgrade=entity:extend({
+  hitbox=box(0,0,8,8),
+  collides_with={"player"},
+  draw_order=5
+})
+
+sword_upgrade:spawns_from(4)
+
+function sword_upgrade:update()
+  if self.t%2==0 then
+    e_add(smoke({
+          pos=v(self.pos.x+rnd(8),self.pos.y+rnd(8)),
+          c=rnd(1)<0.7 and 12 or 7,
+          v=0.15
+      }))
+  end
+end
+
+function sword_upgrade:collide(e)
+  e.dmg*=2
+  e.has_swrd=true
+  self.done=true
+end
+
+-------------------------------
+-- entity: speed upgrade
+-------------------------------
+
+speed_upgrade=entity:extend({
+  hitbox=box(0,0,8,8),
+  collides_with={"player"},
+  draw_order=5,
+})
+
+speed_upgrade:spawns_from(51)
+
+function speed_upgrade:init()
+  self.orig = v(self.pos.x, self.pos.y)
+end
+
+function speed_upgrade:update()
+  if self.t%2==0 then
+    e_add(smoke({
+          pos=v(self.pos.x+rnd(8),self.pos.y+rnd(8)),
+          c=rnd(1)<0.7 and 12 or 7,
+          v=0.15
+      }))
+  end
+
+  self.pos = self.orig+v(0, 3*sin(self.t/40+0.25))
+end
+
+function speed_upgrade:render()
+  spr(self.sprite + (self.t*0.05)%2, self.pos.x, self.pos.y)
+end
+
+function speed_upgrade:collide(e)
+  e.basevel*=1.5
+  self.done=true
+end
+
+-------------------------------
+-- entity: bat
+-------------------------------
+
+bat=enemy:extend({
+  hitbox=box(1,0,8,5),
+  collides_with={"player"},
+  draw_order=5,
+  state="idle",
+  attack_dist=60,
+  vel=v(0,0),
+  maxvel=0.5,  
+  fric=2,
+  acc=2,
+  health=1,
+  c_tile=false
+})
+
+bat:spawns_from(55)
+
+function bat:init()
+  self.orig = v(self.pos.x, self.pos.y)
+end
+
+function bat:idle()
+  if not scene_player then return end
+  local dist=sqrt(#v(scene_player.pos.x-self.pos.x,
+             scene_player.pos.y-self.pos.y))
+  if dist < self.attack_dist then 
+    self:become("attacking")
+    self.sprite=53
+    self.ssize=2
+    self.svel=0.05
+  end
+end
+
+function bat:attacking()
+  if not scene_player then return end
+
+  self.dir=v(scene_player.pos.x-self.pos.x,
+             scene_player.pos.y-self.pos.y):norm()  
+
+  self:set_vel()
+
+  self.pos += v(0, 0.5*sin(self.t/40+0.5))
+end
+
+-------------------------------
+-- entity: pot
+-------------------------------
+pot=entity:extend({
+  hitbox=box(0,0,8,8),
+  collides_with={"player","attack"},
+  state="notbroke"
+  })
+pot:spawns_from(17)
+
+function pot:collide(e)
+  if (e:is_a("player"))return c_push_out
+
+  if e:is_a("attack") and self.state~="broke"then
+    shake+=2
+    self.sprite=18
+    self:become("broke")
+    mset(self.map_pos.x,self.map_pos.y,0)
+    self.hitbox=box(0,3,8,8)
+    self.collides_with={}
+    if rnd(1)<0.1 then
+      e_add(slowmo_obj({pos=self.pos+v(0,-5)}))
+    end
+    -- e_add(spart({sprite=self.sprite,b=box(0,0,4,4),pos=self.pos}))
+    -- e_add(spart({sprite=self.sprite,b=box(0,4,4,8),pos=self.pos+v(0,1)}))
+  end
+  
+end
+
+-------------------------------
+-- entity: spart
+-------------------------------
+spart=entity:extend({
+
+})
+
+function spart:render()
+  local y=flr(self.sprite/16)
+  local x=self.sprite-y*16
+  for j=self.b.xl,self.b.xr-1 do
+    for i=self.b.yt,self.b.yb-1 do
+      local p=sget(j+x*8,i+y*8)
+      pset(self.pos.x+j,self.pos.y+i,p)
+    end
+  end
+end
+
+-------------------------------
+-- entity: slowdown
+-------------------------------
+slowdown=entity:extend({
+  hitbox=box(0,0,8,8),
+  tags={"slowdown"},
+  draw_order=2
+  })
+slowdown:spawns_from(56)
+
+-------------------------------
 -- entity: fireplace
 -------------------------------
 
 fireplace=entity:extend(
   {
-    fr=2,ff=2
+    fr=2,ff=2,
+    draw_order=2
   }
 )
 
@@ -944,7 +1108,7 @@ end
 -- level loading
 -------------------------------
 
-level_index=v(0,0)
+level_index=v(4,1)
 
 function load_level()
   old_ent=shallow_copy(entities)  
@@ -959,7 +1123,7 @@ level=entity:extend({
  draw_order=1
 })
  function level:init()
-  -- start with a lit area. Any light_switches will make the room dark
+  -- start with a lit area. any light_switches will make the room dark
   enable_light=false
   local b,s=
    self.base,self.size
@@ -1023,7 +1187,7 @@ function cam:update()
   self.pos.y=approach(self.pos.y,level_index.y*128,self.spd.y)
 
   if self.pos==level_index*128 then
-    remove_old({"player","camera"})
+    remove_old({"player","camera","key", "door"})
   end
 
   if shake > 0 then
@@ -1115,6 +1279,170 @@ function light_switch:render()
   return
 end
 
+-------------------------------
+-- entity: chest
+-------------------------------
+
+chest=entity:extend({
+  collides_with={"player"},
+  hitbox=box(0,0,8,8),
+  draw_order=1
+})
+
+chest:spawns_from(5,6)
+
+function chest:init()
+  self.col=false
+  self.obj=self.sprite==5 and key({pos=deep_copy(self.pos)}) or slowmo_obj({pos=deep_copy(self.pos+v(0,-4))})
+  self.sprite=5
+end
+
+function chest:open()
+  e_add(self.obj)
+
+  for i=1,4 do
+    e_add(smoke({
+        pos=v(self.pos.x+rnd(8),self.pos.y+rnd(2))
+        }))
+  end
+  shake+=2
+
+  mset(self.map_pos.x,self.map_pos.y,0)
+  self:become("nil")
+end
+
+function chest:update()
+  if (not scene_player)return
+  local ec,oc=c_get_entity({pos=self.pos,hitbox=box(-4,-4,12,12)}),c_get_entity(scene_player)
+  self.col=ec.b:overlaps(oc.b)
+  if btn(5) and ec.b:overlaps(oc.b) and self.state~="nil" then
+    self.sprite=6
+    self:become("open");
+  end
+end
+
+function chest:render()
+  spr(self.sprite,self.pos.x,self.pos.y)
+  if self.col then
+    rectfill(self.pos.x+1,self.pos.y-5,self.pos.x+4,self.pos.y-1,7)
+    print("\151",self.pos.x,self.pos.y-5,0)
+  end
+end
+
+function chest:collide(e)
+  return c_push_out
+end
+
+-------------------------------
+-- entity: key
+-------------------------------
+
+key=dynamic:extend({
+  collides_with={"player","door"},
+  hitbox=box(-4,-4,12,12),
+  tags={"key"},
+  maxvel=0.7,
+  draw_order=2
+})
+
+key:spawns_from(16)
+
+function key:init()
+  self.render=spr_render
+  self.sprite=16
+end
+
+function key:update()
+  if not self.follows then return end
+
+  self.dir=v(self.follows.pos.x-self.pos.x,
+             self.follows.pos.y-self.pos.y)
+  self.maxvel=sqrt(#self.dir)/15
+  self.dir=self.dir:norm()
+
+  self:set_vel()
+end
+
+function key:collide(e)
+  if (e:is_a("player")) self.follows=e
+  if e:is_a("door") then
+    for i=1,4 do
+      e_add(smoke({
+        pos=v(self.pos.x+rnd(8),self.pos.y+rnd(8)),
+        vel=v(rnd(0.5)-0.25,-(rnd(1)+0.5))
+        }))
+    end
+    self.done=true
+  end
+end
+
+-------------------------------
+-- entity: door
+-------------------------------
+
+door=entity:extend({
+  collides_with={"player","key"},
+  tags={"door"},
+  hitbox=box(0,0,16,16),
+  keycount=3,
+  draw_order=2
+})
+
+door:spawns_from(11)
+
+function door:init()
+	mset(self.map_pos.x,self.map_pos.y,0)	
+end
+
+function door:render()
+  spr(self.sprite,self.pos.x,self.pos.y,2,2)
+  if (self.keycount==3) spr(13,self.pos.x-1,self.pos.y+5)
+  if (self.keycount<=3 and self.keycount>=1) spr(13,self.pos.x+4,self.pos.y+5)
+  if (self.keycount<=3 and self.keycount>=2) spr(13,self.pos.x+9,self.pos.y+5)
+end
+
+function door:collide(e)
+  if (e:is_a("player")) return c_push_out
+  if e:is_a("key") then
+    self.keycount-=1
+    if self.keycount<=0 then
+      self.done=true 
+      for i=1,8 do
+        e_add(smoke({
+          pos=v(self.pos.x+rnd(16),self.pos.y+rnd(16)),
+          vel=v(rnd(0.5)-0.25,-(rnd(1)+0.5))
+          }))
+      end
+      shake+=6
+    end
+    shake+=2
+  end
+end
+
+-------------------------------
+-- entity: slowmo
+-------------------------------
+
+slowmo_obj=entity:extend({
+  collides_with={"player"},
+  hitbox=box(0,0,8,8),
+  sprite=49
+})
+
+slowmo_obj:spawns_from(49)
+
+function slowmo_obj:init()
+  self.orig=v(self.pos.x, self.pos.y)
+end
+
+function slowmo_obj:update()
+  self.pos = self.orig+v(0, 2*sin(self.t/50))
+end
+
+function slowmo_obj:collide(e)
+  slowmo+=150
+  self.done=true
+end
 
 -------------------------------------------------------------------
 -- particles
@@ -1147,7 +1475,8 @@ end
 smoke=particle:extend(
   {
     vel=v(0,0),
-    c=7
+    c=7,
+    v=0.1
   }
 )
 
@@ -1157,7 +1486,7 @@ function smoke:init()
 end
 
 function smoke:update()
-  self.r-=0.1
+  self.r-=self.v
   if self.r<=0 then self.done=true end
 end
 
@@ -1192,57 +1521,77 @@ end
 function ptext:render()
   if (not self.pos) return
 
+  --rectfill(self.pos.x,self.pos.y,self.pos.x+4*#self.txt+2,self.pos.y+4,0)
 
-  rectfill(self.pos.x,self.pos.y,self.pos.x+4*#self.txt+2,self.pos.y+4,0)
-
+  print(self.txt,self.pos.x-1,self.pos.y,0)
+  print(self.txt,self.pos.x+1,self.pos.y,0)
+  print(self.txt,self.pos.x,self.pos.y-1,0)
+  print(self.txt,self.pos.x,self.pos.y+1,0)
+  print(self.txt,self.pos.x+1,self.pos.y+1,0)
+  print(self.txt,self.pos.x+1,self.pos.y-1,0)
+  print(self.txt,self.pos.x-1,self.pos.y+1,0)
+  print(self.txt,self.pos.x-1,self.pos.y-1,0)
   print(self.txt,self.pos.x,self.pos.y,self.c or 7)
 
-  if self.t > 2*self.lifetime/3 then
+  if self.lifetime>0 and self.t > 2*self.lifetime/3 then
     draw_dithered(
       (self.lifetime-self.t)/(2*self.lifetime/3),false,
       box(self.pos.x,self.pos.y,self.pos.x+4*#self.txt+2,self.pos.y+4))
   end
 end
 
-
 -------------------------------
--- fade particle
+-- dialog box
 -------------------------------
 
-fade=particle:extend(
-  {
+dialog=entity:extend({
+  spd=1
+  })
+
+function dialog:init()
+  self.text_obj=ptext({
+    pos=v(self.pos.x,self.pos.y),
+    txt="",
     vel=v(0,0),
-    lifetime=15,
-    c=0,
-    follow=nil,
-    rec=box(0,0,8,8),
-    et=10,
-    fadein=false
-  }
-)
+    lifetime=-1,
+    c=9
+    })
+  p_add(self.text_obj)
+  self.text_obj.vel=v(0,0)
+  self.text_obj.lifetime=-1
+  self.index=0
+  self.sline=15
+  self.nline=1
 
-function fade:init()
-
-end
-
-function fade:update()
-  if self.follow then
-    self.pos=self.follow.pos
+  local i=self.sline
+  while i<#self.text do
+    while sub(self.text,i,i)~=" " and i<#self.text do
+      i+=1
+    end
+    if (i==#self.text)break
+    self.text=sub(self.text,1,i) .. "\n" .. sub(self.text,i+1,#self.text)
+    i+=self.sline
   end
-  if self.t>self.et then self.done=true end
 end
 
-function fade:render()
-  if (not self.pos) return
+function dialog:update()
+  if (not self.text) return
 
-  draw_dithered(self.t/self.et,fadein)
-  rectfill(self.pos.x+self.hitbox.xl,
-           self.pos.y+self.hitbox.yt,
-           self.pos.x+self.hitbox.xr,
-           self.pos.y+self.hitbox.yb,c)
-  fillp()
+  if self.t > self.spd then 
+    self.t = 0
+    if self.index <= #self.text then
+      self.index+=1
+      self.text_obj.txt=sub(self.text, 1, self.index)
+      if (sub(self.text, self.index, self.index)=="\n")self.nline+=1
+    end
+  end
+  self.text_obj.pos=self.pos+v(-self.sline*2,-(self.nline-1)*5)
 end
-
+function dialog:destroy()
+  self.text_obj.done=true
+  self.done=true
+end
+function dialog:render() end
 
 -------------------------------
 -- collision system
@@ -1250,8 +1599,8 @@ end
 
 function do_movement()
   for e in all(entities) do
-    if (slowmo and (e_is_any(e,{"player","camera","attack"}) or slowmo_update)) or 
-        (not slowmo) then
+    if (slowmo>0 and (e_is_any(e,{"player","camera","attack"}) or slowmo_update)) or 
+        (slowmo<=0) then
       if e.vel then
         e.pos.x+=e.vel.x
         collide_tile(e)        
@@ -1536,7 +1885,7 @@ function p_update()
     end
     if (p.update) p:update()
 
-    if p.t > p.lifetime or p.done then
+    if (p.lifetime>0 and p.t > p.lifetime) or p.done then
       p_remove(p)
     else
       p.t+=1
@@ -1579,8 +1928,8 @@ end
 -- update them based on their state
 function e_update_all()  
   for e in all(entities) do
-    if (slowmo and (e_is_any(e,{"player","camera","attack"}) or slowmo_update)) or 
-        (not slowmo) then
+    if (slowmo>0 and (e_is_any(e,{"player","camera","attack"}) or slowmo_update)) or 
+        (slowmo<=0) then
       if e[e.state] then
         e[e.state](e)
       end
@@ -1644,10 +1993,8 @@ function approach(val,target,step)
   step=abs(step)
   if val < target then
     return min(val+step,target)
-  elseif val > target then
-    return max(val-step,target)
   else
-    return target
+    return max(val-step,target)
   end  
 end
 
@@ -1661,17 +2008,6 @@ function remove_old(tags)
     if (rmv) e_remove(e)
   end
   old_ent={}
-end
-
-function remove_all_but(tags)
-  for e in all(entities) do
-    local rmv=true
-    for t in all(tags) do
-      if (e:is_a(t)) rmv=false
-    end
-
-    if (rmv) e_remove(e)
-  end
 end
 
 function draw_dithered(t,flip,box,c)
@@ -1720,7 +2056,7 @@ end
 global_timer={ t = 60 }
 lights={}
 enable_light=false
-slowmo = true
+slowmo = 0
 slowmo_update=false
 lightpoints={}
 
@@ -1749,22 +2085,25 @@ function _update()
   do_collisions()
   p_update()
 
-  if not slowmo or (slowmo and slowmo_update) then
+  if slowmo<=0 or (slowmo>0 and slowmo_update) then
     timer_update(global_timer)
   end
+
+  if slowmo>0 then slowmo-=1 end
 
   slowmo_update=not slowmo_update
   last=time()
 
-  if btnp(4) then slowmo=not slowmo end
+  --if btnp(4) then slowmo=not slowmo end
 end
 
 function _draw()
   cls()
 
-  if slowmo then
+  if slowmo>0 then
     pal(0,7)
     pal(7,0)
+    pal(9,0)
   end
   rectfill(0,0,128,128,0)
   palt(0, false)
@@ -1796,53 +2135,53 @@ function _draw()
   end
 end
 __gfx__
-00000000000000001007770111111111110700110000000007777770111111111111111111111111007777000000000000000000000000000000000000000000
-00000000000770001077070110001111110770110777777070000007111111111111111111111111070000700000000000000000000000000000000000000000
-00000000007007001077770100700000110770117000000770000007111111111111111111000011700000070000000000000000000000000000000000000000
-07770000070990701000000177777777110770117007700700000000100000011111111110099001707007070000000000000000000000000000000000000000
-07077777007007000077770070777770100770017770077777700777009999000000000000900900700000070000000000000000000000000000000000000000
-07770707070770700700007000700000107777017007700770077007090000900999999009000090700000070000000000000000000000000000000000000000
-00000000700000070001100010001111100700017000000770000007090000909000000909099090070000700000000000000000000000000000000000000000
-00000000077777701111111111111111110770117777777777777777009999000999999000900900007777000000000000000000000000000000000000000000
-11000001111111111100000199999000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10077701110000011007770100909099999990900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10777701100777011077770199999009009090990000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10770701107777011077070100099099999990090000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10777700107707011077770100009090000990990000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10000077107777001000000099999099999990900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-17777007177770771777707790000009900000990000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-17007007170070071700700799999999999999990000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-11000001100777011100000110077701110000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10077701107070011007770110777001100777010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10770701107777011077070110777701107707010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10777701100000011077770110000001107777010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10000001007777001000000100777700100000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10777701070000701077770107000070107777010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10700701000110001007700100011000100770010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-10000001111111111100001111111111110000110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000aa000007777000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00a00a00070000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0a0000a0700700070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0a0000a0700700070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00a00a00700070070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00066000700007070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000070000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00066000007777000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000007700000777077700077000000077777700077770000000077777700000000000000000000000000000000000077007700000000000000000000000
-07007000070770700777077700700700077700000077700007770077070000707777777777777777077777777777777000077770777000000000000000000000
-70700007707707700000000000777700700000000000000000007707070000707000000000000007070000000000007000077007000770000000000000000000
-07000000770000007077707700707700700000000000000000000007070000707000000000000007070000000000007007777000700007700000000000000000
-00000700000007007077707700707700070000000000000000000007070000707000000000000007070000000000007007070007000000700000000000000000
-00007070077070700000000000770700070000000000000000000070070000707000000000000007070000000000007007007000700000700000000000000000
-07000700707077700777077700770700070000000000000000000070070000707777777777777777070000777700007007000007000000700000000000000000
-00000000770007700777077700777700070000000000000000000070070000700700070007000700070000700700007007000007700000700000000000000000
-00000000077077707770777000777700070000000000000000000070070000700000000007000070070000700700007007000770077000700000000000000000
-00000700777077700000000000707700700000000000000000000070070000707777777707000070070000777700007007077000000770700000000000000000
-00000000770077000777077700777700700000000000000000000007070000700000000007000070070000000000007007700000000007700000000000000000
-00700000000777000777077700770700700000000000000000000007070000700000000007000070070000000000007000707770077707000000000000000000
-00000000770000000000000000770700700000000000000000000007070000700000000007000070070000000000007000707070070707000000000000000000
-00000000777077707770777000770700070000000000000000000070070000700000000007000070070000000000007000707070077707000000000000000000
-70007700777077007770777000777700070000000000000000000070070000707777777707000070077777777777777000707070000007000000000000000000
+11000001111111111100000111111111110700110000000007777770111111111111111111111111007777000000000000000000111111110000000000000000
+10077701110000011007770110001111110770110777777070000007111111111111111111111111070000700000007777000000110000110000000000000000
+10777701100777011077770100700000110770117000000770000007111111111111111111000011700000070000777007770000100770010000000000000000
+10770701107777011077070177777777110770117007700700000000100000011111111110099001707007070007007007007000107007010000000000000000
+10777700107707011077770170777770100770017770077777700777009999000000000000900900700000070077007007007700100700010000000000000000
+10000077107777001000000000700000107777017007700770077007090000900999999009000090700000070707007007007070110770110000000000000000
+17777007177770771777707710001111100700017000000770000007090000909000000909099090070000707007007007007007110000110000000000000000
+17007007170070071700700711111111110770117777777777777777009999000999999000900900007777007007007007007007111111110000000000000000
+11111111007777000000000099999000000000000000000000000000000000000000000000000000000000007007007007007007000000000000000000000000
+11111111070000700000000000909099999990900000000000000000000000000000000000000000000000007007007007007007000000000000000000000000
+00000111007777000077700099999009009090990000000000000000000000000000000000000000000000007007007007007007000000000000000000000000
+07770000070000700700007000099099999990090000000000000000000000000000000000000000000000007007007007007007000000000000000000000000
+07077777777777777700777700009090000990990000000000000000000000000000000000000000000000007007007007007007000000000000000000000000
+07770707777777777777077799999099999990900000000000000000000000000000000000000000000000007007007007007007000000000000000000000000
+00000000077777700077777090000009900000990000000000000000000000000000000000000000000000007007007007007007000000000000000000000000
+11111111007777000000000099999999999999990000000000000000000000000000000000000000000000007777777777777777000000000000000000000000
+11000001100777011100000110077701110000011111111111111111111111111111111100000000000000000000000000000000000000000000000000000000
+10077701107070011007770110777001100777011100000111100000111000011111111100000000000000000000000000000000000000000000000000000000
+10770701107777011077070110777701107707011007770111007770000077001000000000000000000000000000000000000000000000000000000000000000
+10777701100000011077770110000001107777011077070111077070077077700077077000000000000000000000000000000000000000000000000000000000
+10000001007777001000000100777700100000011077770111077770007070700007077700000000000000000000000000000000000000000000000000000000
+10777701070000701077770107000070107777011000000100000000007077700007077700000000000000000000000000000000000000000000000000000000
+10700701000110001007700100011000100770011077770100777701077000000077077700000000000000000000000000000000000000000000000000000000
+10000001111111111100001111111111110000111000000100000001000011110000000000000000000000000000000000000000000000000000000000000000
+000aa000007777000000000011111111111111111000100011111111110707010077000000000000000000000000000000000000000000000000000000000000
+00a00a00070000700007770000000111111111110070007011100011100797007700770000000000000000000000000000000000000000000000000000000000
+0a0000a0700700070070007099990011100001110700900710009000107707700000000000000000000000000000000000000000000000000000000000000000
+0a0000a0700700070007770090909001009900010779097700790970100090000077007700000000000000000000000000000000000000000000000000000000
+00a00a00700070070070007090090900090999000700900707709077111000110000770000000000000000000000000000000000000000000000000000000000
+00066000700007070777777709907770900977700000000000700070111111117700000000000000000000000000000000000000000000000000000000000000
+00077000070000700077777007000007999000071111111110000000111111110077700700000000000000000000000000000000000000000000000000000000
+00066000007777000007770000777770007777701111111111111111111111110000000000000000000000000000000000000000000000000000000000000000
+00000000007700000077000000077000000077777700077770000000077777700000000000000000000000000000000000077007700000000000000000000000
+07007000070770707707700000700700077700000077700007770077070000707777777777777777077777777777777000077770777000000000000000000000
+70700007707707700770000000777700700000000000000000007707070000707000000000000007070000000000007000077007000770000000000000000000
+07000000770000000000000000707700700000000000000000000007070000707000000000000007070000000000007007777000700007700000000000000000
+00000700000007000000770000707700070000000000000000000007070000707000000000000007070000000000007007070007000000700000000000000000
+00007070077070700007700700770700070000000000000000000070070000707000000000000007070000000000007007007000700000700000000000000000
+07000700707077700000707000770700070000000000000000000070070000707777777777777777070000777700007007000007000000700000000000000000
+00000000770007700000000000777700070000000000000000000070070000700700070007000700070000700700007007000007700000700000000000000000
+00000000077077700777000000777700070000000000000000000070070000700000000007000070070000700700007007000770077000700000000000000000
+00000700777077707777700000707700700000000000000000000070070000707777777707000070070000777700007007077000000770700000000000000000
+00000000770077000777000000777700700000000000000000000007070000700000000007000070070000000000007007700000000007700000000000000000
+00700000000777000000000000770700700000000000000000000007070000700000000007000070070000000000007000707770077707000000000000000000
+00000000770000000000777000770700700000000000000000000007070000700000000007000070070000000000007000707070070707000000000000000000
+00000000777077700007777700770700070000000000000000000070070000700000000007000070070000000000007000707070077707000000000000000000
+70007700777077000000777000777700070000000000000000000070070000707777777707000070077777777777777000707070000007000000000000000000
 70000000000000000000000000777700070000000000000000000070077777700700070007000070070007000700007000777777777777000000000000000000
 00000000000000000770077000777700700000000000000000000007070070700700070000000000070007000700007000000000000000000000000000000000
 00000077770000007000700700707070700000000000000000000007077777707777777700000000077777777777777000007000000000000000000000000000
@@ -1852,60 +2191,178 @@ __gfx__
 70700070070007077007700700777700007000000000000000000007077777707000700000000000070070007000707000007000000000000000000000000000
 77007700007700777007000707777770000777000007777700007770070707007000700000000000070070007000707000000000000000000000000000000000
 70007000000700700770077077707077000000777770000077770000007070707777777700000000077777777777777000000070000000000000000000000000
-07000070700000701111111100000000070007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-70707007000707071111111107000700077077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-77070700707070770000000107000700077077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00777707707777000770070100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00070077770070007007770100000000007000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700007007000700070100700070007707700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-07077070070770700077700100700070007707700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-07770007700077701000001100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000
+07000070700000701111111100000000070007000770770000000000000000000000000000000000000000000000000000000000000000000000000000000000
+70707007000707071111111107000700077077007770077000000900000000000000000000000000000000000000000000000000000000000000000000000000
+77070700707070770000000107000700077077007707707009009090000000000000000000000000000000000000000000000000000000000000000000000000
+00777707707777000770070100000000000000000077000090900900000000000000000000000000000000000000000000000000000000000000000000000000
+00070077770070007007770100000000007000707070077009000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700007007000700070100700070007707707700777000000700000000000000000000000000000000000000000000000000000000000000000000000000
+07077070070770700077700100700070007707700770770007000000000000000000000000000000000000000000000000000000000000000000000000000000
+07770007700077701000001100000000000000000000000007000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000
+__label__
+00000000000000000077770000777700007777000077770000000000000000000077770000777700000000000000000000777700007777000077770000000000
+07777777777777000070770000707700007077000070770000000077770000000070770000707700000000777700000000707700007077000070770000000077
+07000000000007000077770000777700007777000077770000077700007770000077770000777700000777000077700000777700007777000077770000077700
+07000000000007000077070000770700007707000077070000770707007077000077070000770700007707070070770000770700007707000077070000770707
+07007070707007700077070000770700007707000077070007007000000700700077070000770700070070000007007000770700007707000077070007007000
+77007070707007070077070000770700007707000077070070700070070007070077070000770700707000700700070700770700007707000077070070700070
+77007770777007770077770000777700007777000077770077007700007700770077770000777700770077000077007700777700007777000077770077007700
+77000070007007700077770000777700007777000077770070007000000700700077770000777700700070000007007000777700007777000077770070007000
+07000070007007700077770000777700007777000077770007000070700000700077770000777700070000707000007000777700007777000077770007000070
+77000000000007070070707000707070007077000070707070707007000707070070770000707700707070070007070700707070007077000070707070707007
+77000000000007770077707000777070007777000077707077070700707070770077770000777700770707007070707700777070007777000077707077070700
+07777777777777000070707000707070007707000070707000777707707777000077070000777700007777077077770000707070007707000070707000777707
+00070077770070000070770000707700007707000070770000070077770070000077070000770700000700777700700000707700007707000070770000070077
+00700700007007000077770000777700007707000077770000700700007007000077070000770700007007000070070000777700007707000077770000700700
+07077070070770700777777007777770007777000777777007077070070770700077770000777700070770700707707007777770007777000777777007077070
+07770007700077707770707777707077007777007770707707770007700077700077770000777700077700077000777077707077007777007770707707770007
+00000000000000000000000000770000007777000000000000000000000000000077770000777700000000000000000000000000007777000000000000000000
+00000077770000000000000007077070007070700000000000000000000000000070707000707070000000000000000000000000007070700000000000000000
+00077700007770000000000070770770007770700000000000000000000000000077707000777070000000000000000000000000007770700000000000000000
+00770707007077000000000077000000007070700000000000000000000000000070707000707070000000000000000000000000007070700000000000000000
+07007000000700700000000000000700007077000000000000000000000000000070770000707700000000000000000000000000007077000000000000000000
+70700070070007070000000007707070007777000000000000000000000000000077770000777700000000000000000000000000007777000000000000000000
+77007700007700770000000070707770077777700000000000000000000000000777777007777770000000000000000000000000077777700000000000000000
+70007000000700700000000077000770777070770000000000000000000000007770707777707077000000000000000000000000777070770000000000000000
+07000070700000700000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000
+70707007000707070000000000000000000000000000000000000000000000000000000000007770000000000000000000000000000000000000070000000000
+77070700707070770000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000
+00777707707777000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000070000000000000
+00070077770070000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000
+00700700007007000000000000000000000000000000000000000000000000000000000000777000000000000000000000000000000000000000000000000000
+07077070070770700000000000000000000000000000077700000000000000000000000000070000000000000000000000000000000000007000770000000000
+07770007700077700000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000000007000000000000000
+00000000000000000000000000000000000000000000070000000000000000000000000000077007700000000000000700000000000000000000000000000000
+00000077770000000000000000000000000000000007700000000000000000000000000000077770777000000000000000000000000000000000000000000000
+00077700007770000000000000000000000000000007707770000000000000000000000000077007000770000000000000000000000000000000000000000000
+00770707007077000000000000000000000000000000007000000000000000000000000007777000700007700070000000000000000000000000000000000000
+07007000000700700000000000000000000000000000007000000000000000000000000007070007000000700000000000000000000000000000000000000000
+70700070070007070000000000000000000000000000777000000000000000000000000007007000700000700000090070000000000000000000000000000000
+77007700007700770000000000000000000000000000777000000000000000000000000007000007000000700000009000000000000000000000000000000000
+70007000000700700000000000000000000000000000000000000000000000000000000007000007700000700000099900000000000000000000000000000000
+07000070700000700077000000000000000000000000000000000000000000000000000007000770077000700000009000000000000000000000000000000000
+70707007000707070707707000000000000000000000000000000000000000000000000007077000000770700900000000000000000000000000000000000000
+77070700707070777077077000000000000000000000000000000000000000000000000007700000000007700000000000000000000000000000000000000000
+00777707707777007700000000000000000000000000000007700700000000000000000000707770077707000007000000000000000000000000000000000000
+00070077770070000000070000000000000000000000000070077700000000000000000000707070070707000007900000000000000000000000000000000000
+00700700007007000770707000000000000000000000000007000700000000000000000000707070077707000000900000000000000000000000000000000000
+07077070070770707070777000000000000000000000000000777000000000000000000000707070000007000009990000000000000000000000000000000000
+07770007700077707700077000000000000000000000000000000000000000000000000000777777777777000000900000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000077000000000000000000000000000000000000007000000000000000000000000000000000000
+00000077770000000000000000000000000000000000000000700700000000000000000000000000000000000077700000000000000000000000000000000000
+00077700007770000000000000000000000000000000000000777700000000000000000000000000000000000097900000000000000000000000000000000000
+00770707007077000000000000000000000000000000000000707700000000000000000000000000000000000099900700000000000000000000000000000000
+07007000000700700000000000000000000000000000000000707700000000000000000000000000000000000999990000000000000000000000000000000000
+70700070070007070000000000000000000000000000000000770700000000000000000000000000000000000999990000000000000000000000000000000000
+77007700007700770000000000000000000000000000000000770700000000000000000000000000000000000999990000000000000000000000000000000000
+70007000000700700000000000000000000000000000000000777700000000000000000000000000000000000797770000000000000000000000000000000000
+07000070700000700000000000000000000000000000000000777700000000000000000000000000000000000777777000000000000000000000000000000000
+70707007000707070000000000000000070007000000000000707700000000000000000000077700000000007077777700000000000000000000000000000000
+77070700707070770000000000000000070007000000000000777700000000000000000000777700000000007077777700000000000000000000000000000000
+00777707707777000000000000000000000000000000000000770700000000000000000000770700000000000077777000000000000000000000000000000000
+00070077770070000000000000000000000000000000000000770700000000000000000000777700000000000770070000000000000000000000000000000000
+00700700007007000000000000000000007000700000000000770700000000000000000000000000000000007007700700000000000000000000000000000000
+07077070070770700000000000000000007000700000000000777700000000000000000007777077000000007007000700000000000000000000000000000000
+07770007700077700000000000000000000000000000000000777700000000000000000007007007000000000770077000000000000000000000000000000000
+00000000000000000077000000000000000000000000000000777700000000000000000000000000000000000000000000000000000000000000000000000000
+00000077770000000707707000000000000000000000000000707070000000000000000000000000000000000000000000000000000000000000000000000000
+00077700007770007077077000000000000000000000000000777070000000000000000000000000000000000000000000000000000000000000000000000000
+00770707007077007700000000000000000000000000000000707070000000000000000000000000000000000000000000000000000000000000000000000000
+07007000000700700000070000000000000000000000000000707700000000000000000000000000000000000000000000000000000000000000000000000000
+70700070070007070770707000000000000000000000000000777700000000000000000000000000000000000000000000000000000000000000000000000000
+77007700007700777070777000000000000000000000000007777770000000000000000000000000000000000000000000000000000000000000000000000000
+70007000000700707700077000000000000000000000000077707077000000000000000000000000000000000000000000000000000000000000000000000000
+07000070700000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+70707007000707070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+77070700707070770000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00777707707777000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00070077770070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700007007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07077070070770700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07770007700077700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000077000000770000000000000000000000000000000000000000000000000000000000000000000000000000
+00000077770000000000000000000000000000007700770077007700000000000000000000000000000000000000000000000000000000000000000000000000
+00077700007770000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00770707007077000000000000000000000000000077007700770077000000000000000000000000000000000000000000000000000000000000000000000000
+07007000000700700000000000000000000000000000770000007700000000000000000000000000000000000000000000000000000000000000000000000000
+70700070070007070000000000000000000000007700000077000000000000000000000000000000000000000000000000000000000000000000000000000000
+77007700007700770000000000000000000000000077700700777007000000000000000000000000000000000000000000000000000000000000000000000000
+70007000000700700000000000000000000000000000000000000000000000000000000000000077700000000000000000000000000000000000000000000000
+07000070700000700000000000770000000000000077000000770000000000000000000000000770700000000000000000000000000000000000000000000000
+70707007000707070000000007077070000000007700770077007700000000000700700000000777700000000000000000000000000000000000070000000000
+77070700707070770000000070770770000000000000000000000000000000007070000700000000000000000000000000000000000000000000000000000000
+00777707707777000000000077000000000000000077007700770077000000000700000000000777700000000000000000000000000000000070000000000000
+00070077770070000000000000000700000000000000770000007700000000000000070000000700700000000000000000000000000000000000000000000000
+00700700007007000000000007707070000000007700000077000000000000000000707000000000000000000000000000000000000000000000000000000000
+07077070070770700000000070707770000000000077700700777007000000000700070000000000000000000000000000000000000000007000770000000000
+07770007700077700000000077000770000000000000000000000000000000000000000000000000000000000000000000000000000000007000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000077000000000000000000000000000000000000
+00000077770000000000000000000000000000000000000000000000000000000000000000000000000000000707707000000000000000000000000000000000
+00077700007770000000000000000000000000000000000000000000000000000000000000000000000000007077077000000000000000000000000000000000
+00770707007077000000000000000000000000000000000000000000000000000000000000000000000000007700000000000000000000000000000000000000
+07007000000700700000000000000000000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000
+70700070070007070000000000000000000000000000000000000000000000000000000000000000000000000770707000000000000000000000000000000000
+77007700007700770000000000000000000000000000000000000000000000000000000000000000000000007070777000000000000000000000000000000000
+70007000000700700000000000000000000000000000000000000000000000000000000000000000000000007700077000000000000000000000000000000000
+07000070700000700077000000000000000770000077000000000000000000000077000000000000000770000000000000000000000000000000000000000000
+70707007000707070707707000000000007007000707707000000000000000000707707000000000007007000000000000000000000000000000000000000000
+77070700707070777077077000000000007777007077077000000000000000007077077000000000007777000000000000000000000000000000000000000000
+00777707707777007700000000000000007077007700000000000000000000007700000000000000007077000000000000000000000000000000000000000000
+00070077770070000000070000000000007077000000070000000000000000000000070000000000007077000000000000000000000000000000000000000000
+00700700007007000770707000000000007707000770707000000000000000000770707000000000007707000000000000000000000000000000000000000000
+07077070070770707070777000000000007707007070777000000000000000007070777000000000007707000000000000000000000000000000000000000000
+07770007700077707700077000000000007777007700077000000000000000007700077000000000007777000000000000000000000000000000000000000000
+00000000000000000000000000000000007777000007700000000000000000000007700000077000007777000000000000000000000000000000000000000000
+00000077770000000000007777000000007077000070070000000077770000000070070000700700007077000000007777000000000000777700000000000077
+00077700007770000007770000777000007777000077770000077700007770000077770000777700007777000007770000777000000777000077700000077700
+00770707007077000077070700707700007707000070770000770707007077000070770000707700007707000077070700707700007707070070770000770707
+07007000000700700700700000070070007707000070770007007000000700700070770000707700007707000700700000070070070070000007007007007000
+70700070070007077070007007000707007707000077070070700070070007070077070000770700007707007070007007000707707000700700070770700070
+77007700007700777700770000770077007777000077070077007700007700770077070000770700007777007700770000770077770077000077007777007700
+70007000000700707000700000070070007777000077770070007000000700700077770000777700007777007000700000070070700070000007007070007000
+07000070700000700700007070000070007777000077770007000070700000700077770000777700007777000700007070000070070000707000007007000070
+70707007000707077070700700070707007077000070770070707007000707070070770000707700007077007070700700070707707070070007070770707007
+77070700707070777707070070707077007777000077770077070700707070770077770000777700007777007707070070707077770707007070707777070700
+00777707707777000077770770777700007707000077070000777707707777000077070000770700007707000077770770777700007777077077770000777707
+00070077770070000007007777007000007707000077070000070077770070000077070000770700007707000007007777007000000700777700700000070077
+00700700007007000070070000700700007707000077070000700700007007000077070000770700007707000070070000700700007007000070070000700700
+07077070070770700707707007077070007777000077770007077070070770700077770000777700007777000707707007077070070770700707707007077070
+07770007700077700777000770007770007777000077770007770007700077700077770000777700007777000777000770007770077700077000777007770007
+
 __gff__
-0000000000010000000000000002020200000000000000000000000000020202000000000000000000000000000200020000000000000000000000000000000001030003010301030303030303030202010300030300030303030303030302020303020301030101010001010100020203030000000000000000000000000002
+0000000000000000000000000002020200000000000000000000000000020202000000000000000000000000000200020000000000000000000000000000000001030103010301030303030303030202010301030300030303030303030302020303020301030103010001010100020203030000000301000000000000000002
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __map__
-6061535353536061535360615353536061535360615353606153536061535353515151515151515151515151515151510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-7071636353637071535370716353637071635370716363707153637071635353513000000051515151515151515151510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-6061004163000000636300000063000000006300000007000063000000006347510000000051515151001313005151510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-7071000000000000000000000000500000000000004041404100000000000059510000005151515100005151005151510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-6061000000000000000000000000000000000000004141414100004c4d500059515100005151000000000051000051510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-7071410000007200001300000000000000000000004140414000005c5d050059515151001300005151510013000051510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-6061000000004300000000000000000000000000000000000000106c6d000057515151515151005151515151510051510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-7071000000005300000000620000000000000000000000000000000000070067515151515151005151515151000051510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-6061410000006300200000000000000000005000000000000000000000000000000051515113005151515151005151510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-7071000000000000000000010000000000000000000000000000000000000000000000000000515151515151005151510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-6061000000000000000000000000000000000000000000000000000000000047515151515173515151515151000051510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-7071004100000000400000000000500000000000000050000000000040000059515151515173730051515151510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-60610000000000000000004100000000000000000000000000000a0000000059515151515151510051510000000051510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-7071410043410000410043000000000000000043000000430000000000004359515151515151510000510051515151510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-6061606153436061434353606160616061606153436061536061434360615359515151515151515100130051515151510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-7071707153537071535353707170717071707153537071537071535370715359515151515151515151515151515151510000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000053530000535353000000000000535353535353535353535353535357000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000063630000636363000000000000636363636363636363636363636367000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000606160615360615040755075436061437553436061005000004360614043606140634a58585858585858585858585858584b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000707170715370714360616061537071534363537071606160615370710053707160615968686868686868686868686868685900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000006300005370717071530000635375630000707170715300004363000070715711000000000000000000000000115900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000005300000000630000006375606100000000006300005300000000416700000000000000747407000000005900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000006061000000006300000000000000000075707100000000000000006300000000520000007474007400000000000000005900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000007071000000000000000000000000000000000000000000000000000000000000414700000000007400000000000000005900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000040000000004100500000000000000000000040435974740074000000137474747474005900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000006061000000000050000000000000000041410000000000000000000000006061535900000074007474007413000074005900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000070710000000000000000000000000000000000000000000000000000000070716359007400000000000a7400040074005900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000606100000000000000000000000000000000000000000000000000000060615900740074740074007413000074005900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000707100000000000000005000000041606100000000400000000050000070715900000000000074137474747474005900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000004000000000000000000041707100000000000000000000000060615974740000740000000000000000005900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000070715900000000740000000000000000005900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000060610000500000000000000000000040000000000041415900000000070000000000000000005900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000043000000004300000070710000006061434360610000000000000000410041415911000000000000000000000000115900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000053606160615343000000000000007071536370710000000000000000004341415a58585858585858585858585858585b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000000000000000000000000000000006370717071535300000000000000000053606143000050000000000000530000606141434175434360616061434300415a5858585858490b0c4858585858585b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000063530000000000000000005370715360610040606100064353606170714163606153537071707153536061436868686868681b1c68686868684343000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000053000000000000000000530000637071414170716061536370716061000070716353000000005363707153430000000000000000000000005353000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000063000000000000000000630000370000000000007071630050417071000000000063000000006300000063530000000000000000000040435363000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000003700000060614150004000000000000072000000004100630000000100000000500000536300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000000500000000000000070714141000000000000000043000000004143000000000000000000000000630043000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000500063000000000063410000000000000000000000000053000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000011731100000000000000000000070000000000000000000000000000000050000000006220000000000063000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000073137300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000500011731100000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000400000000000000000000000004c4d00000000767600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000070000000000004075754100000000005c5d00000076606100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000430000000000000000000000000000000000000000007676417541757575750000424200000076707100010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000436061530000400043000060610000000000000000000000437676757573137375410000014200000000767600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000537071537500000053606170716061004360610060616061536061417573730011110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000635050637500004153707140507071435370714170717071537071757573737375417541417541757541754175414175000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
