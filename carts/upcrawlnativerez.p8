@@ -315,7 +315,7 @@ function enemy:damage(s)
   if not self.hit then
     sfx(37)
     s=s or 1
-    self.health-=s/level_params[current_level].hm
+    self.health-=s/lp.hm
     p_add(ptext({
       pos=v(self.pos.x-10,self.pos.y),
       txt="+"..s,
@@ -377,8 +377,8 @@ player=dynamic:extend({
   tags={"player"}, dir=v(1,0),
   hitbox=box(1,0,3,4),
   c_tile=true,
-  health=4,
-  maxh=4,
+  health=5,
+  maxh=5,
   sprite=0,
   draw_order=7,
   fric=0.5,
@@ -628,10 +628,8 @@ function door:collide()
 end
 
 function door:update()
-  if near_player(self.pos,64) then
-    for i=1,2 do
-      p_add(smoke{pos=v(self.pos.x+rnd(8),self.pos.y+5),c=choose({1,12}),v=0.2})
-    end
+  for i=1,2 do
+    p_add(smoke{pos=v(self.pos.x+rnd(8),self.pos.y+5),c=choose({1,12}),v=0.2})
   end
 end
 
@@ -665,7 +663,7 @@ function coin:update()
 end
 
 function coin:collide(e)
-  if (rp_coin_collected) rp_coin_collected+=1*level_params[current_level].hm
+  if (rp_coin_collected) rp_coin_collected+=1*lp.hm
   self.done=true
   sfx(51)
 end
@@ -757,7 +755,7 @@ function bat:init()
   self.dir=v(0,0)
   self.vel=v(0,0)
   self.coindrop=3
-  self.maxvel*=level_params[current_level].hm
+  self.maxvel*=lp.hm
 end
 
 function bat:idle()
@@ -817,11 +815,6 @@ function laserdude:shooting()
 end
 
 function laserdude:wondering()
-  if scene_player then
-    if not near_player(self.pos,64) then return end
-  else
-    return
-  end
   local wonder_time=60
   if self.t > wonder_time and not self.hit then
     self:become("shooting")
@@ -1062,7 +1055,7 @@ dmg_potion:spawns_from(43)
 function dmg_potion:update() end
 
 function dmg_potion:init()
-  self.perk=level_params[current_level].hm*rnd(10)+10
+  self.perk=lp.hm*rnd(10)+10
 end
 
 function dmg_potion:use()
@@ -1093,6 +1086,7 @@ end
 -- item: health_potion
 -------------------------------
 
+mhealth=12
 health_potion=dmg_potion:extend({
   sprcoord=v(80,8),
   hitbox=box(0,0,8,8),
@@ -1106,7 +1100,7 @@ function health_potion:use()
       pos=v(self.pos.x-10,self.pos.y),
       txt= "+1 health",
       }))
-  if (scene_player.maxh<7) scene_player.maxh+=1
+  if (scene_player.maxh<mhealth) scene_player.maxh+=1
   scene_player.health=scene_player.maxh
   health_cost=flr(50 + (scene_player.maxh-4)*50)
 end
@@ -1245,7 +1239,6 @@ level=entity:extend({
    end
   end
 
-  local lp=level_params[current_level]
   local en=clamp(0,80,ceil(#enemy_pool*lp.pe))
   local ln=ceil(#loot_pool*lp.pl)
 
@@ -1277,7 +1270,7 @@ level=entity:extend({
 
 function do_movement()
   for e in all(entities) do
-      if e.vel and near_player(e.pos,64) then
+      if e.vel and near_player(e.pos,128) then
         for i=1,2 do
           e.pos.x+=e.vel.x/2
           collide_tile(e)
@@ -1487,14 +1480,7 @@ function c_push_out(oc,ec,allowed_dirs)
  ec.b=ec.b:translate(sepv)
  return sepv
  end
--- inverse of c_push_out - moves
--- the object with the :collide()
--- method out of the other object.
--- function c_move_out(oc,ec,allowed)
---  return c_push_out(ec,oc,allowed)
--- end
-
-
+ 
 --------------------
 -- entity handling
 --------------------
@@ -1550,7 +1536,7 @@ end
 -- update them based on their state
 function e_update_all()  
   for e in all(entities) do
-    if near_player(e.pos,64) then
+    if near_player(e.pos,128) then
       if (e[e.state])e[e.state](e)
       if (e.update)e:update()
       e.t+=1
@@ -1567,14 +1553,14 @@ r_entities = {}
 function e_draw_all()
   for i=0,7 do
     for e in all(r_entities[i]) do
-      if (e.render and (near_player(e.pos,64) or e:is_a("level")))e:render()
+      if (e.render and (near_player(e.pos,128) or e:is_a("level")))e:render()
     end
   end
 end
 
 function p_draw_all()
   for p in all(particles) do
-    if(_update==update_title or near_player(p.pos,64))p:render()
+    if(_update==update_title or near_player(p.pos,128))p:render()
   end
 end
 
@@ -1615,7 +1601,7 @@ function frac(val)
 end
 
 function ceil(val)
-  if (frac(val)>0) return flr(val+sign(val)*1)
+  if (frac(val)>0) return flr(val+sign(val))
   return val
 end
 
@@ -1880,28 +1866,29 @@ function delete_all(but)
 end
 
 function draw_ui()
-  rectfill(0,57,127,64,0)
+  rectfill(0,120,127,127,0)
 
-  print("z",1,58,7)
-  rect(7,57,16,63,7)
+  print("z",1,121,7)
+  rect(7,120,16,127,7)
   
   local item=scene_player.item
-  if(item)sspr(item.sprcoord.x,item.sprcoord.y,item.sprsize.x,item.sprsize.y,10,58,4,4)
+  if(item)sspr(item.sprcoord.x,item.sprcoord.y,item.sprsize.x,item.sprsize.y,10,121,4,4)
 
-  print("x",18,58,7)
-  rect(24,57,33,63,7)
+  print("x",18,121,7)
+  rect(24,120,33,127,7)
   local wx,wy=sprite_to_pixel_coordinates(7, 0.5)
-  sspr(wx,wy,7,3,26,59,7,3)
+  sspr(wx,wy,7,3,26,122,7,3)
   
+  local hh=flr(mhealth/2)
   for i=0,scene_player.health-1 do
-    sspr(56,16,4,4,35+(i%4*4),58+flr(i/4)*3)
+    print("\135",35+(i%hh*6),122,8)
   end
   for i=scene_player.health,scene_player.maxh-1 do
-    sspr(60,16,4,4,35+(i%4*4),58+flr(i/4)*3)
+    print("\135",35+(i%hh*6),122,2)
   end
 
-  sspr(8,0,4,4,49,61)
-  print(flr(rp_coin_collected),53,59,7)
+  sspr(8,0,4,4,108,124)
+  print(flr(rp_coin_collected),112,122,7)
 end
 
 function update_endgame()
@@ -1917,21 +1904,21 @@ end
 function draw_endgame()
   cls()
   local coins = "coins lost: " .. tostr(flr(rp_coin_collected))
-  local totalsec = flr((rp_timer) / 30)
+  local totalsec = flr(rp_timer / 30)
   local time = "time: " .. tostr(flr(totalsec / 60)) .. "m " .. tostr(totalsec%60) .. "s"
   local enemies = "kills: " .. tostr(rp_ekilled)
   
   camera()
-  print(time, 32 - (#time/2)*4,16)
-  print(coins, 32 - (#coins/2)*4,22)
-  print(enemies, 32 - (#enemies/2)*4,28)
+  print(time, 64 - 4*#time/2,54)
+  print(coins, 64 - 4*#coins/2,62)
+  print(enemies, 64 - 4*#enemies/2,70)
 
   local res = "x to restart"
-  print(res, 32 - (#res/2)*4, 40)
+  print(res, 64 - 4*#res/2, 40)
 end
 
 function init_level()
-  local lp=level_params[current_level]
+  lp=level_params[current_level]
   local pos_init,pos_end = generate_map(lp.sx, lp.sy, 1, 1)
 
   level_index=v(0, 0)
@@ -1945,19 +1932,15 @@ function init_level()
   if not scene_player then
     scene_player = player{pos=player_pos}
     e_add(scene_player)
-  else
-    scene_player.pos=player_pos
   end
 
-  scene_player.inv=true
+  scene_player.pos,scene_player.inv=player_pos,true
   invoke(function() scene_player.inv=false end,60)
 
   if(is_solid(pos_init.x+4,pos_init.y+4))mset(pos_init.x+4,pos_init.y+4,0)
   mset(pos_init.x+4,pos_init.y+5,35)
 
-  camx = scene_player.pos.x - 32
-  camy = scene_player.pos.y - 32
-  ycamtarget = scene_player.pos.y
+  camx,camy,ycamtarget = scene_player.pos.x - 64, scene_player.pos.y - 64,scene_player.pos.y
 
   p_add(ptext({
       pos=v(scene_player.pos.x-10,scene_player.pos.y),
@@ -1993,9 +1976,9 @@ function draw_level()
   --   s_amount=4
   -- end
   
-  camx += (scene_player.pos.x-32-camx)/cam_vel
+  camx = clamp(0,lp.sx*64-111,camx+(scene_player.pos.x-64-camx)/cam_vel)
   if (scene_player.pos.y>lastpoint) ycamtarget=scene_player.pos.y
-  camy += (ycamtarget-38-camy)/(1.5*cam_vel)
+  camy = clamp(0, lp.sy*64-111, camy+(ycamtarget-70-camy)/(1.5*cam_vel))
   -- camera(camx+rnd(s_amount/2)-s_amount/2, camy+rnd(s_amount/2)-s_amount/2)
   camera(camx,camy)
 end
@@ -2015,6 +1998,7 @@ end
 function update_title()
   update_controller()
   if btn_press(5) then
+    delete_all({})
     cmusic=choose({0,14})
     music(cmusic)
     init_level()
@@ -2023,7 +2007,7 @@ function update_title()
   end
 
   for i=0,1 do
-  	p_add(smoke{pos=v(rnd(64),64),c=choose({6,5}),v=0.01})
+  	p_add(smoke{pos=v(rnd(128),128),c=choose({6,5}),v=0.01})
   end
   p_update()
 end
@@ -2042,14 +2026,14 @@ function draw_title()
   palt(0, false)
   palt(1, true)
   camera()
-  map(120,56,0,0,8,8)
+  map(112,48,0,0,16,16)
   p_draw_all()
 
   local msg1="upcrawl"
   local msg2="press x to start"
 
-  draw_text(msg1, 32 - (#msg1/2)*4,16,13)
-  draw_text(msg2, 32 - (#msg2/2)*4,44,13)
+  draw_text(msg1, 64 - (#msg1/2)*4,16,13)
+  draw_text(msg2, 64 - (#msg2/2)*4,38,13)
 
   palt()
 end
@@ -2058,7 +2042,7 @@ menuitem(1, "music by: " .. (cmusic==14 and "scowsh molosh" or "simon hutchinson
 menuitem(2, "change music", function() cmusic=(cmusic==14) and 0 or 14 music(cmusic) menuitem(1, "music by: " .. (cmusic==14 and "scowsh molosh" or "simon hutchinson")) end)
 
 function _init()
-  poke(0x5f2c, 3)
+  -- poke(0x5f2c, 3)
   init_title()
   _update = update_title
   _draw = draw_title
@@ -2174,25 +2158,25 @@ __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008494a4b4000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000037475767000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000037475767000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000037475767000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000037475767000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000037475767000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008494a4b40000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000037475767000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008696a6b60000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000037475767000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000374757670000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034445464000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000374757670000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000374757670000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000344454640000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000364656660000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000036465666000000000000
 __gff__
 0000000000000000000000000000000000000000000000000000000000000000030303030000000000000000000000000101010300000000030303030700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
