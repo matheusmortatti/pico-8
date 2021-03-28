@@ -589,7 +589,7 @@ function p_draw_all()
 end
 
 function spr_render(e)
-  spr(e.sprite, e.pos.x, e.pos.y,1,1)
+  spr(e.sprite, e.pos.x, e.pos.y,1,1,e.flip)
 end
 
 ------------------------------------
@@ -616,6 +616,10 @@ end
 
 function clamp(low, hi, val)
 	return (val < low) and low or (val > hi and hi or val)
+end
+
+function dist_vector(a,b)
+  return v(a.x-b.x,a.y-b.y)
 end
 
 function choose(arg)
@@ -708,7 +712,7 @@ end
 -- game state + globals
 ------------------------------------
 
-debug=false
+debug=true
 global_timer = 60
 gamestate = {}
 
@@ -792,8 +796,6 @@ level=entity:extend({
 })
 
 function level:init()
- -- start with a lit area. any light_switches will make the room dark
- enable_light=false
  local b,s=
   self.base,self.size
  for x=0,s.x-1 do
@@ -814,9 +816,7 @@ function level:init()
     })  
 
     -- register the entity
-   if e:is_a("player") and not scene_player then
-     scene_player=e
-   end
+   if (e:is_a("player")) scene_player=e
    e_add(e)
     -- replace the tile
     -- with empty space
@@ -846,7 +846,8 @@ cam=entity:extend(
     spd=v(10,10),
     pos=level_index*128,
     draw_order=0,
-    shk=v(0,0)
+    shk=v(0,0),
+    persistent=true
   }
 )
 
@@ -854,9 +855,7 @@ function cam:update()
   self.pos.x=approach(self.pos.x,level_index.x*128,self.spd.x)
   self.pos.y=approach(self.pos.y,level_index.y*128,self.spd.y)
 
-  if self.pos==level_index*128 then
-    remove_old({"player","camera","key", "gate","pedestal"})
-  end
+  if (self.pos==level_index*128) remove_old()
 
   if shake > 0 then
     shk=v(rnd(1)<0.5 and 1 or -1,rnd(1)<0.5 and 1 or -1)
@@ -867,20 +866,14 @@ function cam:update()
   end
 
   if scene_player then
-    local p=scene_player
-    local l_ind=v(flr((p.pos.x+p.hitbox.xl+(p.hitbox.xr-p.hitbox.xl)/2)/128),
-                  flr((p.pos.y+p.hitbox.yt+(p.hitbox.yb-p.hitbox.yt)/2)/128))
+    local h=scene_player.hitbox
+    local p=scene_player.pos
+    local l_ind=v(flr((p.x+h.xl+(h.xr-h.xl)/2)/128),
+                  flr((p.y+h.yt+(h.yb-h.yt)/2)/128))
 
     if level_index ~= l_ind then
       level_index=l_ind
       load_level()
-    end
-  end
-
-  if enable_light then
-    for l in all(lights) do
-      l.pos=v(self.pos.x,self.pos.y)+l.off
-      l:update()
     end
   end
 end
@@ -889,14 +882,9 @@ function cam:render()
   camera(self.pos.x+shk.x,self.pos.y+shk.y)
 end
 
-function remove_old(tags)
+function remove_old()
   for e in all(old_ent) do
-    local rmv=true
-    for t in all(tags) do
-      if (e.is_a and e:is_a(t)) rmv=false
-    end
-
-    if (rmv) e_remove(e)
+    if (not e.persistent) e_remove(e)
   end
   old_ent={}
 end
@@ -911,7 +899,6 @@ end
 
 smoke=particle:extend(
   {
-    vel=v(0,0),
     c=7,
     v=0.1
   }
@@ -928,7 +915,6 @@ function smoke:update()
 end
 
 function smoke:render()
-  if (not self.pos) return  
   circfill(self.pos.x, self.pos.y, self.r, self.c)
 end
 
@@ -956,18 +942,14 @@ function ptext:update()
 end
 
 function ptext:render()
-  if (not self.pos) return
-
-  --rectfill(self.pos.x,self.pos.y,self.pos.x+4*#self.txt+2,self.pos.y+4,0)
-
-  print(self.txt,self.pos.x-1,self.pos.y,0)
-  print(self.txt,self.pos.x+1,self.pos.y,0)
-  print(self.txt,self.pos.x,self.pos.y-1,0)
-  print(self.txt,self.pos.x,self.pos.y+1,0)
-  print(self.txt,self.pos.x+1,self.pos.y+1,0)
-  print(self.txt,self.pos.x+1,self.pos.y-1,0)
-  print(self.txt,self.pos.x-1,self.pos.y+1,0)
-  print(self.txt,self.pos.x-1,self.pos.y-1,0)
+  local offs={
+    v(-1,0),v(1,0),v(0,-1),v(0,1),
+    v(1,1),v(1,-1),v(-1,1),v(-1,-1),
+  }
+  for o in all(offs) do
+    print(self.txt,self.pos.x+o.x,self.pos.y+o.y,0)
+  end
+  
   print(self.txt,self.pos.x,self.pos.y,self.c or 7)
 
   if self.t > 2*self.lifetime/3 then
@@ -1123,9 +1105,7 @@ function sword_attack:init()
   for i=1,4 do
    e_add(smoke({
     pos=v(self.pos.x+rnd(8),self.pos.y+rnd(8)),
-    vel=v(rnd(0.5)-0.25,-(rnd(1)+0.5)),
     c=rnd(1)<0.7 and 12 or 7,
-    v=0.15
    }))
   end
  end
@@ -1268,7 +1248,6 @@ light_system:spawns_from(48)
 
 function light_system:update()
   if current_level and not self.tpos then
-    printh("current level: " .. current_level.pos.x .. " " .. current_level.pos.y)
     self.tpos = current_level.base
     self.ppos = current_level.pos
   end
@@ -1320,7 +1299,7 @@ pedestal:spawns_from(78)
 
 function pedestal:init()
   e_add(key({
-     pos=v(self.pos.x+4,self.pos.y-2),
+     pos=v(self.pos.x+4,self.pos.y-10),
     }))
 end
 
@@ -1337,7 +1316,8 @@ key=dynamic:extend({
  scl=0.01,
  sprite=13,
  spd=0.05,
- c_tile=false
+ c_tile=false,
+ persistent=true
 })
 
 function key:init()
@@ -1345,24 +1325,17 @@ function key:init()
   self:become("idle")
 end
 
+function key:idle()
+  self.pos += v(0, 0.5*sin(self.t/70+0.5))
+end
+
 function key:follow()
   local g = e_find_tag("gate")
-  if (g~=nil and is_in_level(self, g)) self.p=g
+  if (g and is_in_level(self, g)) self.p=g
 
   local v=self.p.pos-self.pos
   self.dir=v:norm()
   self.vel=self.dir*(v:len()-4)*self.spd
-end
-
-function key:render()
-  if self.state == "idle" then
-    spr(
-      self.sprite, 
-      self.original_pos.x, 
-      self.original_pos.y + self.amp*sin(self.t*self.scl))
-  else
-    self.render=spr_render
-  end
 end
 
 function key:collide(e)
@@ -1373,9 +1346,7 @@ function key:collide(e)
    for i=1,2 do
     e_add(smoke({
       pos=v(self.pos.x+rnd(8),self.pos.y+rnd(8)),
-      vel=v(rnd(0.5)-0.25,-(rnd(1)+0.5)),
-      c=rnd(1)<0.7 and 6 or 7,
-      v=0.15
+      c=rnd(1)<0.7 and 6 or 7
     }))
    end
   elseif e:is_a("key") then
@@ -1401,13 +1372,11 @@ gate:spawns_from(11)
 function gate:dead()
   if (self.t==60) self.done=true
   if self.t%4 then
-    local p=self.pos+v(2+rnd(12), 2+rnd(12))
+    local p=self.pos+v(2+rnd(10), 2+rnd(10))
     for i=1,2 do
       e_add(smoke({
         pos=v(p.x+rnd(4), p.y+rnd(4)),
-        vel=v(rnd(0.5)-0.25,-(rnd(1)+0.5)),
-        c=rnd(1)<0.7 and 6 or 7,
-        v=0.15
+        c=rnd(1)<0.7 and 6 or 7
       }))
     end
     shake=3
@@ -1425,9 +1394,13 @@ function gate:render()
 end
 
 function gate:collide(e)
-  if (e:is_a("player")) return c_push_out
-  self.kcount-=1
-  if(self.kcount==0) self:become("dead")
+  if e:is_a("key") then
+    self.kcount-=1
+    if(self.kcount<=0) self:become("dead")
+    return
+  end
+  
+  return c_push_out
 end
 
 -->8
@@ -1535,7 +1508,7 @@ bat=enemy:extend({
   collides_with={"player"},
   draw_order=5,
   state="idle",
-  attack_dist=60,
+  attack_dist=60*60,
   vel=v(0,0),
   maxvel=0.5,  
   fric=0.1,
@@ -1546,14 +1519,9 @@ bat=enemy:extend({
 
 bat:spawns_from(55)
 
-function bat:init()
-  self.orig = v(self.pos.x, self.pos.y)
-end
-
 function bat:idle()
   if not scene_player then return end
-  local dist=sqrt(#v(scene_player.pos.x-self.pos.x,
-             scene_player.pos.y-self.pos.y))
+  local dist=#dist_vector(scene_player.pos,self.pos)
   if dist < self.attack_dist then 
     self:become("attacking")
     self.sprite=53
@@ -1565,9 +1533,7 @@ end
 function bat:attacking()
   if not scene_player then return end
 
-  self.dir=v(scene_player.pos.x-self.pos.x,
-             scene_player.pos.y-self.pos.y):norm()  
-
+  self.dir=dist_vector(scene_player.pos,self.pos):norm()
   self:set_vel()
 
   self.pos += v(0, 0.5*sin(self.t/40+0.5))
@@ -1852,7 +1818,7 @@ __map__
 7500000000000000000000000000007575000000000000000000000000000075750000000000000000000000000000757500000000000000000000000000007575000000000000000000000000000075750000000000000000000000000000757500000000000000000000000000007575000000000000000000000000000075
 7575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757500007575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575
 757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575750b0c7575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575
-750000000000000000000000000000757500000000000000000000000000007575000000000000000000000000000075755151510000000000000000000030757500000000001b1c0000000000000075750000000000000000000000000000757500000000000000000000000000007575000000000000000000000000000075
+750000000000000000000000000000757500000000000000000000000000007575000000000000000000000000000075755151510000000000000000000000757500000000001b1c0000000000003775750000000000000000000000000000757500000000000000000000000000007575000000000000000000000000000075
 7500000000000000000000000000007575000000000000000000000000000075750000000000000000000000000000757551515100000000000000000000007575000000000000000000606100000075750000000000000000000000000000757500000000000000000000000000007575000000000000000000000000000075
 750000000000000000000000000000757500000000000000000000000000007575000000000000000000000000000075755151510000000000000000000000757500004c4d0000000000707100000075750000000000000000000000000000757500000000000000000000000000007575000000000000000000000000000075
 750000000000000000000000000000757500000000000000000000000000007575000000000000000000000000000075750000000000000000000000000000757500005c5d0000000000000000000075750000000000000000000000000000757500000000000000000000000000007575000000000000000000000000000075
