@@ -91,6 +91,7 @@ end
 entity=object:extend(
   {
     t=0,
+    persistent=false,
     spawns={}
   }
 )
@@ -782,6 +783,7 @@ function load_level()
    pos=v(level_index.x*128,level_index.y*128),
    size=v(16,16)
  })
+ 
  e_add(current_level)
 end
 
@@ -814,13 +816,12 @@ function level:init()
     -- register the entity
    if e:is_a("player") and not scene_player then
      scene_player=e
-     mset(b.x+x,b.y+y,0)
    end
    e_add(e)
     -- replace the tile
     -- with empty space
     -- in the map
-    --mset(b.x+x,b.y+y,0)
+    if (e.persistent) mset(b.x+x,b.y+y,0)
     blk=0
    end
   end
@@ -998,7 +999,8 @@ player=dynamic:extend({
  dmg=1,
  has_swrd=false,
  basevel=1,
- lr=32
+ lr=32,
+ persistent=true
 })
 
 player:spawns_from(32)
@@ -1258,8 +1260,6 @@ lightpoints = {}
 light_system=entity:extend({
  tags={"light_system"},
  draw_order=7,
- tpos = nil,
- ppos = nil,
  rects={},
  pt={0b0.1,0b0101101001011010.1,0b1111111111111111.1}
 })
@@ -1268,6 +1268,7 @@ light_system:spawns_from(48)
 
 function light_system:update()
   if current_level and not self.tpos then
+    printh("current level: " .. current_level.pos.x .. " " .. current_level.pos.y)
     self.tpos = current_level.base
     self.ppos = current_level.pos
   end
@@ -1277,20 +1278,20 @@ function light_system:update()
       local ll=1
       for e in all(lightpoints) do
         local r=e.lr
-        if r~=nil then
+        if r then
           local dist = v(
-            abs(e.pos.x-(self.ppos.x+i*16)),
-            abs(e.pos.y-(self.ppos.y+j*16))
+            abs(e.pos.x-(self.ppos.x+i*8)),
+            abs(e.pos.y-(self.ppos.y+j*8))
           ):len()
 
           if dist < r then
             ll=3
-          elseif dist < (r+16) and ll<2 then
+          elseif dist < (r+8) and ll<2 then
             ll=2
           end
         end
       end
-      self.rects[i*16+j] = {self.ppos.x+i*16,self.ppos.y+j*16,ll}
+      self.rects[i*16+j] = {self.ppos.x+i*8,self.ppos.y+j*8,ll}
     end
   end
 end
@@ -1300,7 +1301,7 @@ function light_system:render()
     local v=self.rects[i-1]
     local x,y,ll=v[1],v[2],v[3]
     fillp(self.pt[ll])
-    rectfill(x,y,x+16,y+16,0)
+    rectfill(x,y,x+8,y+8,0)
     fillp()
   end
 end
@@ -1312,15 +1313,14 @@ end
 pedestal=entity:extend({
   tags={"pedestal"},
   draw_order=1,
+  persistent=true
 })
 
 pedestal:spawns_from(78)
 
 function pedestal:init()
-  mset(self.map_pos.x,self.map_pos.y,0)
   e_add(key({
      pos=v(self.pos.x+4,self.pos.y-2),
-     map_pos=self.map_pos
     }))
 end
 
@@ -1393,11 +1393,10 @@ gate=entity:extend({
   tags={"gate"},
   kspr=13,
   kcount=3,
+  persistent=true
 })
 
 gate:spawns_from(11)
-
-function gate:init() mset(self.map_pos.x,self.map_pos.y,0) end
 
 function gate:dead()
   if (self.t==60) self.done=true
