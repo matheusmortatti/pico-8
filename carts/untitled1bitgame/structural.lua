@@ -21,8 +21,7 @@ function gamestate.init()
    }
  ))
  
- palt(0, false)
- palt(1, true)
+ reset_pal()
 end
 
 pft=time()
@@ -56,6 +55,12 @@ end
 -------------------------------
 -- structural
 -------------------------------
+
+function reset_pal()
+  pal()
+  palt(0, false)
+  palt(1, true)
+end
 
 function add_time(t)
 	global_timer += t
@@ -103,6 +108,8 @@ level=entity:extend({
  draw_order=1
 })
 
+entity_map={}
+
 function level:init()
  local b,s=
   self.base,self.size
@@ -121,11 +128,17 @@ function level:init()
      vel=v(0,0),
      sprite=blk,
      map_pos=v(b.x+x,b.y+y)
-    })  
+    })
 
-    -- register the entity
+    local em=tostr(b.x+x)..","..tostr(b.y+y)
+    if not e.spawn_condition or 
+       e:spawn_condition(entity_map[em]) then
+      -- register the entity
+      e_add(e)
+    end
+
+
    if (e:is_a("player")) scene_player=e
-   e_add(e)
     -- replace the tile
     -- with empty space
     -- in the map

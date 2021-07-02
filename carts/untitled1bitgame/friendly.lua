@@ -19,6 +19,7 @@ player=dynamic:extend({
  hit=false,
  dmg=1,
  has_swrd=false,
+ sword_upgrade=false,
  basevel=1,
  lr=32,
  persistent=true
@@ -79,7 +80,7 @@ function player:attacking()
     {
       pos=self.pos+dir*8,
       facing=dir,
-      upg=self.has_swrd
+      upg=self.sword_upgrade
     }
   )
   self.attk.dmg=self.dmg
@@ -190,7 +191,8 @@ end
 
 function sword_attack:collide(e)
  if e:is_a("enemy") and not e.hit then
-  e:damage(self.dmg)
+  local multiplier=self.upg and 2 or 1
+  e:damage(self.dmg*multiplier)
   local allowed_dirs={
    v(-1,0)==self.facing,
    v(1,0)==self.facing,
@@ -261,27 +263,31 @@ function dialogue_box:update()
 end
 
 function dialogue_box:stop()
-    self.running=false
+  self.running=false
 end
 
 function dialogue_box:start()
-    self.running=true
-    self.index=1
-    self.cursor=0 self.offset=0 self.line_size=0
+  self.running=true
+  self.index=1
+  self.cursor=0 self.offset=0 self.line_size=0
 end
 
 function dialogue_box:next()
-    self.index+=1
-    self.cursor=0 self.offset=0 self.line_size=0
-    if (not self.running)self:start()
-    if (self.index>#self.lines) self:stop()
+  if (not self.running)self:start() return
+  
+  -- if we are not at the end of the line, do nothing
+  if (self.cursor != 0 and self.cursor < #self.lines[self.index]) return
+
+  self.index+=1
+  self.cursor=0 self.offset=0 self.line_size=0
+  if (self.index>#self.lines) self:stop()
 end
 
 function dialogue_box:render()
-    if (not self.running) return
-    local x,y=self.pos.x-10,self.pos.y-5-self.base_offset*self.offset
-    if (self.cursor ~= 0) rectfill(x, y-1, x+4*self.line_size, y+6*(self.offset+1), 0)
-    print(sub(self.lines[self.index], 0, self.cursor), x, y, 7)
+  if (not self.running) return
+  local x,y=self.pos.x-10,self.pos.y-5-self.base_offset*self.offset
+  if (self.cursor ~= 0) rectfill(x, y-1, x+4*self.line_size, y+6*(self.offset+1), 0)
+  print(sub(self.lines[self.index], 0, self.cursor), x, y, 7)
 end
 
 -------------------------------
@@ -605,5 +611,39 @@ function chimney:update()
           pos=v(self.pos.x+3+rnd(2),self.pos.y-1),
           c=7,r=1+rnd(1),v=0.15
         }))
+  end
+end
+
+-------------------------------
+-- entity: sword upgrade
+-------------------------------
+
+sword_upgrade=entity:extend({
+  collides_with={"player"},
+  hitbox=box(0,0,8,8)
+})
+
+sword_upgrade:spawns_from(4)
+
+function sword_upgrade:update()
+  self.pos += v(0, 0.2*sin(self.t/80+0.5))
+
+  if self.t%3==0 then
+    p_add(smoke({
+          pos=v(self.pos.x+rnd(8),self.pos.y+8),
+          c=12,r=1+rnd(1),v=0.15
+        }))
+  end
+end
+
+function sword_upgrade:collide(e)
+  e.sword_upgrade=true
+  self.done=true
+  shake=5
+  for i=0,10 do
+    p_add(smoke({
+      pos=v(self.pos.x+rnd(8),self.pos.y+8),
+      c=rnd(1)<0.9 and 12 or 7,r=1+rnd(1),v=0.15
+    }))
   end
 end
