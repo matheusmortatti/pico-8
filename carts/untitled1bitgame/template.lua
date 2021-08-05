@@ -75,6 +75,14 @@ end
   return self.x..","..self.y
  end
 
+ function vector:copy()
+  return v(self.x,self.y)
+ end
+
+ function zero_vector()
+  return v(0,0)
+ end
+
 -- creates a new vector with
 -- the x,y coords specified
 function v(x,y)
@@ -132,6 +140,15 @@ function entity:spawns_from(...)
   end
 end
 
+function entity:is_in_any_state(...)
+  for st in all({...}) do
+    if self.state==st then
+      return true
+    end
+  end
+  return false
+end
+
 function entity:draw_dit(ct,ft,flp)
   draw_dithered(
    ct/ft,
@@ -160,21 +177,23 @@ dynamic=entity:extend({
   })
   
 function dynamic:set_vel()  
+  local x,y=0,0
   if (self.vel.x<0 and self.dir.x>0) or
      (self.vel.x>0 and self.dir.x<0) or
      (self.dir.x==0) then     
-    self.vel.x=approach(self.vel.x,0,self.fric)
+    x=approach(self.vel.x,0,self.fric)
   else
-    self.vel.x=approach(self.vel.x,self.dir.x*self.maxvel,self.acc)
+    x=approach(self.vel.x,self.dir.x*self.maxvel,self.acc)
   end
 
   if (self.vel.y<0 and self.dir.y>0) or
      (self.vel.y>0 and self.dir.y<0) or
      (self.dir.y==0) then
-    self.vel.y=approach(self.vel.y,0,self.fric)
+    y=approach(self.vel.y,0,self.fric)
   else
-    self.vel.y=approach(self.vel.y,self.dir.y*self.maxvel,self.acc)
+    y=approach(self.vel.y,self.dir.y*self.maxvel,self.acc)
   end
+  self.vel=v(x,y)
 end
 
 ------------------------------------

@@ -27,14 +27,18 @@ function smoke:render()
   circfill(self.pos.x, self.pos.y, self.r, self.c)
 end
 
-function add_explosion(pos,n,rnx,rny)
+function add_explosion(pos,n,rnx,rny,offx,offy,c1,c2,shk)
   for i=1,n do
-    e_add(smoke({
-      pos=v(pos.x+rnd(rnx or 4), pos.y+rnd(rny or 4)),
-      c=rnd(1)<0.7 and 6 or 7
-    }))
+    e_add(create_smoke(pos,rnx,rny,offx or 0,offy or 0,c1 or 6,c2 or 7))
   end
-  shake=3
+  shake=shk or 3
+end
+
+function create_smoke(pos,rnx,rny,offx,offy,c1,c2)
+  return smoke({
+    pos=v(pos.x+rnd(rnx or 4)-offx, pos.y+rnd(rny or 4)-offy),
+    c=rnd(1)<0.5 and c1 or c2
+  })
 end
 
 -------------------------------

@@ -6,7 +6,12 @@ debug=false
 global_timer = 60
 gamestate = {}
 
+if not cartdata("mortatti_u1bg") then
+  dset(0,3)
+end
+
 function gamestate.init()
+
   for i=0,127 do
     for j=0,63 do
       if mget(i,j)==32 then

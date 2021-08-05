@@ -2,207 +2,6 @@
 -- friendly
 ------------------------------------
 
-------------------------------------
--- e_player
-------------------------------------
-
-player=dynamic:extend({
- state="walking", vel=v(0,0),
- collides_with={"slowdown"},
- tags={"player"}, dir=v(1,0),
- hitbox=box(2,3,6,8),
- sprite=0,
- draw_order=3,
- fric=0.5,
- inv_t=30,
- ht=0,
- hit=false,
- dmg=1,
- has_swrd=false,
- sword_upgrade=false,
- basevel=1,
- lr=32,
- persistent=true
-})
-
-player:spawns_from(32)
-
-function player:init()
- self.last_dir=v(1,0)
- add(lightpoints, self)
-end
-
-function player:destroy()
- del(lightpoints, self)
-end
-
-function player:update()
- self.ht+=1
- if self.ht > self.inv_t then
-  self.hit=false
-  self.ht=0
- end
-
-  if global_timer==0 and self.state!="dead" then
-    self:become("dead") self.sprite=37
-  end
-end
-
-function player:walking()
- self.dir=v(0,0)
-
- if self.hit and self.ht<self.inv_t/2 then self:set_vel() return end
-
- if btn(0) then self.dir.x = -1 end
- if btn(1) then self.dir.x =  1 end
- if btn(2) then self.dir.y = -1 end
- if btn(3) then self.dir.y =  1 end
-
- self:set_vel()
-
- -- correct diagonal movement
- if self.vel.x ~= 0 and self.vel.y ~= 0 then
-  self.vel/=1.4
- end
-
- if (self.dir~=v(0,0)) self.last_dir=v(self.dir.x,self.dir.y)
-
- if btnp(4) then 
-  self:become("attacking")
- end
- self.maxvel = self.basevel
-end
-
-function player:attacking()
- if not self.attk then
-  local dir=self.last_dir.x~=0 and v(self.last_dir.x,0) or v(0, self.last_dir.y)
-  self.attk=sword_attack(
-    {
-      pos=self.pos+dir*8,
-      facing=dir,
-      upg=self.sword_upgrade
-    }
-  )
-  self.attk.dmg=self.dmg
-  e_add(self.attk)    
- end
-
- self.vel=v(0,0)
- if self.attk.done then 
-  self.attk=nil 
-  self:become("walking")
- end
-end
-
-function player:dead()
-  self.vel=v(0,0)
-  if (self.t>30*5) run(stat(6))
-end
-
-function player:render()
-  if (self.hit and self.t%3==0) return
-
-  local st,flip,spd="idle",false,0.1
-
-  if self.state=="dead" then
-    self.sprite+=spd
-    self.sprite=min(self.sprite,40)
-  else
-    st=self.vel==v(0,0) and "idle" or "walking"
-    flip=false
-    spd=st=="idle" and 0 or 0.15
-    self.sprite=st=="idle" and 32 or 33
-    self.sprite+=flr(self.t*spd)%4
-  end
-
-  if self.last_dir.x<0 then
-    flip=true
-  end
-
- spr(self.sprite, self.pos.x, self.pos.y, 1, 1, flip)
-end
-
-function player:damage()
- if not self.hit then
-  p_add(ptext({
-    pos=v(self.pos.x-10,self.pos.y),
-    txt="-1"
-  }))
-  self.ht=0
-  self.hit=true
-
-  return true
- end  
-end
-
--- function player:collide(e)
---  if e:is_a("slowdown") then
---   self.maxvel=self.basevel/2
---  end
--- end
-
--------------------------------
--- entity: sword_attack
--------------------------------
-
-sword_attack=entity:extend(
-{
- lifetime=10,
- hitbox=box(0,0,8,8),
- tags={"attack"},
- collides_with={"enemy"},
- facing=v(1,0),
- dmg=1,
- sprite=3,
- draw_order=5
-})
-
-function sword_attack:init()
- if self.upg then
-  for i=1,4 do
-   e_add(smoke({
-    pos=v(self.pos.x+rnd(8),self.pos.y+rnd(8)),
-    c=rnd(1)<0.7 and 12 or 7,
-   }))
-  end
- end
-end
-
-function sword_attack:update()
- self.flipx=self.facing.x==-1
- self.flipy=self.facing.y==1
-
- if self.facing.x ~= 0 then self.sprite=3 else self.sprite=4 end
- if self.t > self.lifetime then self.done=true end
-
- self.hitbox=nil
-end
-
-function sword_attack:render()  
- spr(self.sprite, self.pos.x, self.pos.y, 1, 1, self.flipx, self.flipy)
-
- local nf=v(abs(self.facing.y),abs(self.facing.x))
- local off=v(abs(self.facing.x),abs(self.facing.y))*4+v(4,4)
- local pos=self.pos+nf*2
- if self.t >= 3*self.lifetime/4 then
-  self:draw_dit((self.lifetime-self.t),(self.lifetime/4))    
- end
-end
-
-function sword_attack:collide(e)
- if e:is_a("enemy") and not e.hit then
-  local multiplier=self.upg and 2 or 1
-  e:damage(self.dmg*multiplier)
-  local allowed_dirs={
-   v(-1,0)==self.facing,
-   v(1,0)==self.facing,
-   v(0,-1)==self.facing,
-   v(0,1)==self.facing
-  }
-  return c_push_vel,{allowed_dirs,1}
- end
-end
-
 -------------------------------
 -- entity: fireplace
 -------------------------------
@@ -227,12 +26,7 @@ function fireplace:destroy()
 end
 
 function fireplace:update()
-  p_add(smoke(
-    {
-      pos=v(self.pos.x+4+rnd(2)-1,self.pos.y+2+rnd(2)-1),
-      c=rnd(1)<0.5 and 7 or 9
-    }
-  ))
+  add_explosion(self.pos,1,2,2,-3,-1,7,9,0)
 end
 
 -------------------------------
@@ -424,8 +218,11 @@ key=dynamic:extend({
 })
 
 function key:init()
-  self.original_pos = self.pos
   self:become("idle")
+  self.si=flr(self.pos.x/128)+8*flr(self.pos.y/128)
+  if band(dget(1),shl(1,self.si))!=0 then
+    self.done=true
+  end
 end
 
 function key:idle()
@@ -445,6 +242,7 @@ function key:collide(e)
   if (self.state=="idle") self.p=e self:become("follow")
   if e:is_a("gate") then
    self.done=true
+   dset(1, bor(dget(1),shl(1,self.si)))
    add_explosion(self.pos,2,8,8)
   elseif e:is_a("key") then
     return c_push_out
@@ -516,7 +314,14 @@ gate=entity:extend({
 
 gate:spawns_from(11)
 
-function gate:init() self.pos+=self.off end
+function gate:init() 
+  self.pos+=self.off
+  self.kcount=dget(0)
+end
+
+function gate:update()
+  if(self.kcount<=0) self:become("dead")
+end
 
 function gate:dead()
   if (self.t==60) self.done=true
@@ -539,30 +344,11 @@ end
 function gate:collide(e)
   if e:is_a("key") then
     self.kcount-=1
-    if(self.kcount<=0) self:become("dead")
+    dset(0, self.kcount)
     return
   end
   
   return c_push_out
-end
-
--------------------------------
--- entity: slowdown
--------------------------------
-
-slowdown=entity:extend({
-  hitbox=box(0,0,8,8),
-  tags={"slowdown"},
-  collides_with={"player","enemy"},
-  draw_order=1
-})
-
-slowdown:spawns_from(56)
-
-function slowdown:collide(e)
-  if e.basevel then
-    e.maxvel=e.basevel/2
-  end
 end
 
 -------------------------------
@@ -637,13 +423,9 @@ function sword_upgrade:update()
 end
 
 function sword_upgrade:collide(e)
+  dset(2,1)
   e.sword_upgrade=true
   self.done=true
   shake=5
-  for i=0,10 do
-    p_add(smoke({
-      pos=v(self.pos.x+rnd(8),self.pos.y+8),
-      c=rnd(1)<0.9 and 12 or 7,r=1+rnd(1),v=0.15
-    }))
-  end
+  add_explosion(self.pos,10,8,0,0,-8,12,7,0)
 end

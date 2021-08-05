@@ -36,9 +36,7 @@ function enemy:init()
 end
 
 function enemy:enemy_update()
-    self.ht+=1
-
-    if (self.hit) self.dir=v(0,0)
+    if (self.hit) self.ht+=1 self.dir=zero_vector()
 
     if self.ht > self.inv_t then
         self.hit=false
@@ -77,6 +75,8 @@ function enemy:damage(s)
     self.hit=true
     shake=5
     self.ht=0
+
+    if (self.hit_reaction) self:hit_reaction()
   end 
 end
 
@@ -87,7 +87,7 @@ end
 function enemy_collide(self, e)
   if (self.state=="dead") return
   if e:is_a("player") and e.damage and e:damage() then
-    local d=v(e.pos.x-self.pos.x,e.pos.y-self.pos.y)
+    local d=e.pos-self.pos
     if #d>0.01 then d=d:norm() end
     e.vel=d*3
     add_time(-self.take)
@@ -120,11 +120,12 @@ bat=enemy:extend({
   draw_order=5,
   state="idle",
   attack_dist=10*60,
-  vel=v(0,0),
+  vel=zero_vector(),
   maxvel=0.3,  
   fric=0.1,
   acc=2,
   health=2,
+  sprite=55,
   c_tile=false
 })
 
@@ -160,7 +161,10 @@ spike=enemy:extend({
   collides_with={"player"},
   tags={},
   draw_order=1,
-  state="low"
+  state="low",
+  low_t=60,
+  mid_t=60,
+  high_t=90
 })
 
 spike:spawns_from(116,115)
@@ -181,13 +185,13 @@ end
 function spike:low()
   self.hitbox=nil
   self.sprite=nil
-  if (self.t>60) self:become("mid")
+  if (self.t>self.low_t) self:become("mid")
 end
 
 function spike:mid()
   self.hitbox=nil
   self.sprite=115
-  if self.t>60 then 
+  if self.t>self.mid_t then 
     self:become("high")
     add_explosion(self.pos+v(0,6),3,8,2)
   end
@@ -196,7 +200,7 @@ end
 function spike:high()
   self.hitbox = self.hb
   self.sprite=116
-  if (self.t>90 and self.ps~="waiting") self:become("low")
+  if (self.t>self.high_t and self.ps~="waiting") self:become("low")
 
 end
 
@@ -293,10 +297,11 @@ end
 
 blob=enemy:extend({
   state="moving",
-  vel=v(0,0),
+  vel=zero_vector(),
   hitbox=box(1,3,7,8),  
   maxvel=0.5,
   spd=1,
+  sprite=7,
   health=1
 })
 
@@ -311,8 +316,7 @@ end
 function blob:moving()
   if not scene_player then return end
 
-  self.dir=v(scene_player.pos.x-self.pos.x,
-             scene_player.pos.y-self.pos.y):norm()
+  self.dir=(scene_player.pos-self.pos):norm()
 
   self.maxvel = self.spd*(cos(self.t/20)+1)/2 + 0.1
 
@@ -339,10 +343,14 @@ charger:spawns_from(21)
 function charger:update()
     self:enemy_update()
 
+    local level_pos=level_index*128
+    local last_pos=self.pos:copy()
+    self.pos.x=clamp(level_pos.x,level_pos.x+120,self.pos.x)
+    self.pos.y=clamp(level_pos.y,level_pos.y+120,self.pos.y)
+    if(last_pos!=self.pos) self:become("frozen")
+
     if not scene_player or 
-       self.state=="frozen" or 
-       self.state=="charging" or 
-       self.state=="dead" then
+       self:is_in_any_state("frozen","charging","dead") then
       return
     end
 
@@ -378,7 +386,7 @@ end
 
 function charger:choosing()
     self.maxvel=self.basevel
-    self.vel=v(0,0)
+    self.vel=zero_vector()
     self.sprite=21
     self.ssize=1
     if self.t<60 then return end
@@ -395,7 +403,7 @@ function charger:walking()
   local d=(self.target-self.pos)
   if #d < #self.vel then
     self:become("choosing")
-    self.pos=v(self.target.x,self.target.y)
+    self.pos=self.target:copy()
   else
     self.dir=d:norm()
     self:set_vel()
@@ -405,7 +413,7 @@ end
 function charger:frozen()
   self.sprite=21
   self.ssize=1
-  self.vel=v(0,0)
+  self.vel=zero_vector()
   if (self.t>30) self:become("choosing")
 end
 
@@ -439,7 +447,7 @@ end
 laserdude=enemy:extend(
   {
     state="wondering",
-    vel=v(0,0),
+    vel=zero_vector(),
     hitbox=box(-4,-4,4,4),
     health=4,
     give=4,
@@ -452,34 +460,16 @@ laserdude=enemy:extend(
 laserdude:spawns_from(10)
 
 function laserdude:shooting()
-  self.vel=v(0,0)
+  self.vel=zero_vector()
 
   local llength=5
   if self.t==10 then
     shake+=5
-    -- for i=0,llength-1 do
-    --   local l=laser({dir=v(0,-1),pos=v(self.pos.x-self.r+1,self.pos.y-self.r-i*8)})
-    --   l.lifetime=10+i
-    --   e_add(l)
-    --   l=laser({dir=v(0,1),pos=v(self.pos.x-self.r+1,self.pos.y+self.r+i*8)})
-    --   l.lifetime=10+i
-    --   e_add(l)
-    --   l=laser({dir=v(1,0),pos=v(self.pos.x+self.r+i*8,self.pos.y-self.r+1)})
-    --   l.lifetime=10+i
-    --   e_add(l)
-    --   l=laser({dir=v(-1,0),pos=v(self.pos.x-self.r-i*8,self.pos.y-self.r+1)})
-    --   l.lifetime=10+i
-    --   e_add(l)
-    -- end
 
-    e_add(bullet({dir=v(0,-1),pos=v(self.pos.x-self.r,self.pos.y-self.r)}))
-    e_add(bullet({dir=v(1,0),pos=v(self.pos.x+self.r,self.pos.y+self.r/2)}))
-    -- l=bullet({dir=v(1,0),pos=v(self.pos.x+self.r,self.pos.y-self.r+1)})
-    -- l.lifetime=10
-    -- e_add(l)
-    -- l=bullet({dir=v(-1,0),pos=v(self.pos.x-self.r,self.pos.y-self.r+1)})
-    -- l.lifetime=10
-    -- e_add(l)
+    e_add(bullet({dir=v(0,-1),pos=v(self.pos.x,self.pos.y-self.r/2)}))
+    e_add(bullet({dir=v(0,1),pos=v(self.pos.x,self.pos.y+self.r)}))
+    e_add(bullet({dir=v(1,0),pos=v(self.pos.x+self.r/2,self.pos.y)}))
+    e_add(bullet({dir=v(-1,0),pos=v(self.pos.x-self.r/2,self.pos.y)}))
 
   end
   if self.t > 30 then
@@ -510,83 +500,110 @@ function laserdude:render()
   end
 end
 
-laser=entity:extend(
-  {
-    hitbox=box(0,0,8,8),
-    give=4,
-    take=2,
-    dir=v(1,0),
-    collides_with={"player","oldman"},
-    c_tile=false
-  }
-)
-
-function laser:init()
-  if (not self.lifetime) self.lifetime=10
-  self.hitbox=box(0,0,8,8)
-
-  if self.dir.x<0 then
-    self.hitbox.xl=-8
-    self.hitbox.xr=0
-  end
-
-  if self.dir.y<0 then
-    self.hitbox.yt=-8
-    self.hitbox.yb=0
-  end
-
-  if self.dir.x~=0 then
-    self.hitbox.yt=3
-    self.hitbox.yb=5
-  end
-
-  if self.dir.y~=0 then
-    self.hitbox.xl=3
-    self.hitbox.xr=5
-  end
-end
-
-function laser:update()
-  if (self.t>self.lifetime) self.done=true
-end
-
-laser.collide=enemy.collide
-
-function laser:render()
-  rectfill(self.hitbox.xl+self.pos.x,self.hitbox.yt+self.pos.y,
-           self.hitbox.xr+self.pos.x,self.hitbox.yb+self.pos.y,9)
-  if self.t >= 3*self.lifetime/4 then
-    self:draw_dit((self.lifetime-self.t),(self.lifetime/4),false)    
-  end
-end
-
 -------------------------------
 -- entity: bullet
 -------------------------------
 
-bullet=enemy:extend({
-    collides_with={"player"},
-    tags={"bullet"},
-    hitbox=box(-1,-1,1,1),
-    vel=v(0,0),
-    maxvel=2,
-    c_tile=true,
-    lifetime=30,
-    r=3
+bullet=dynamic:extend({
+  collides_with={"player"},
+  tags={"bullet"},
+  hitbox=box(-1,-1,1,1),
+  maxvel=2,
+  c_tile=true,
+  lifetime=30,
+  r=3
 })
 
-function bullet:init()
-  
-end
-
 function bullet:update()
-  self:enemy_update()
   self:set_vel()
-  printh(self.pos:str())
+  if self.t%5==0 then
+    local s=create_smoke(self.pos,2,2,1,1,7,9)
+    
+    s.vel=v(rnd(1)-0.5,rnd(1)-0.5)
+    p_add(s)
+  end
 
   if (self.t > self.lifetime) self.done=true
 end
 
 function bullet:render()
-  circfill(self.pos.x, self.pos.y, 3)
+  circfill(self.pos.x,self.pos.y,self.r,9)
+end
+
+function bullet:collide(e)
+  add_explosion(self.pos,2,2,2,1,1,7,9,0)
+  if e.damage then
+    if e:damage() then
+      e.vel=self.dir*3
+    end
+  end
+  self.done=true
+end
+
+function bullet:tcollide()
+  add_explosion(self.pos,2,2,2,-3,-1,7,9,0)
+  self.done=true
+end
+
+-------------------------------
+-- entity: spawner
+-------------------------------
+
+enemy_list={charger, blob, laserdude, bat}
+
+spawner=enemy:extend({
+  collides_with={"player"},
+  state="spawn",
+  hitbox=box(0,0,8,8),
+  maxvel=2,
+  c_tile=true,
+  spawn_time=10*30,
+  svel=0.2,
+  spawn_number=2,
+  spawn_limit=5,
+  spawn_list={}
+})
+
+spawner:spawns_from(45)
+
+function spawner:cooldown()
+  self:become("spawn")
+end
+
+function spawner:spawn()
+  self:manage_spawn_list()
+  if self.t>=self.spawn_time then
+    if #self.spawn_list < self.spawn_limit then
+      for i=1,self.spawn_number do
+        local dirs={
+          v(-1,0),v(1,0),v(0,-1),v(0,1),
+          v(-1,-1),v(1,1),v(1,-1),v(-1,1)}
+        local mp=v(self.map_pos.x, self.map_pos.y)
+        local e=enemy_list[flr(rnd(#enemy_list)+1)]
+
+        mp+=dirs[flr(rnd(#dirs)+1)]
+        
+        local e_inst=e({
+          pos=mp*8,
+          vel=zero_vector(),
+          map_pos=mp
+        })
+        e_add(e_inst)
+        add(self.spawn_list, e_inst)
+
+        add_explosion(e_inst.pos,2,2,2,-3,-1,7,9,0)
+
+        if (e==bat) e_inst.attack_dist=10000
+      end
+    end
+    self:become("cooldown")
+  end
+end
+
+function spawner:manage_spawn_list()
+  for e in all(self.spawn_list) do
+    if e.done then
+      del(self.spawn_list, e)
+    end
+  end
 end
