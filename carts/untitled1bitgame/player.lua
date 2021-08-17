@@ -26,6 +26,7 @@ player=dynamic:extend({
    function player:init()
     self.last_dir=v(1,0)
     self.sword_upgrade=dget(2)==1 and true or false
+    if (dget(3)==1) self:upgrade_movement()
     add(lightpoints, self)
    end
    
@@ -42,6 +43,20 @@ player=dynamic:extend({
    
      if global_timer==0 and self.state!="dead" then
        self:become("dead") self.sprite=37
+     end
+
+     if self.t%15==0 and self.vel!=zero_vector() and self.movement_upgrade then
+      for i=1,3 do
+        p_add(smoke(
+        {
+            pos=v(
+                self.pos.x+4,
+                self.pos.y+7),
+            c=rnd(1)<0.5 and 7 or 9,
+            r=rnd(2)+0.2,v=0.2
+        }
+        ))
+      end
      end
    end
    
@@ -119,11 +134,11 @@ player=dynamic:extend({
     spr(self.sprite, self.pos.x, self.pos.y, 1, 1, flip)
    end
    
-   function player:damage()
+   function player:damage(dmg)
     if not self.hit then
      p_add(ptext({
        pos=v(self.pos.x-10,self.pos.y),
-       txt="-1"
+       txt="-"..dmg
      }))
      self.ht=0
      self.hit=true
@@ -132,11 +147,10 @@ player=dynamic:extend({
     end  
    end
    
-   -- function player:collide(e)
-   --  if e:is_a("slowdown") then
-   --   self.maxvel=self.basevel/2
-   --  end
-   -- end
+   function player:upgrade_movement()
+    self.basevel *= 1.3
+    self.movement_upgrade=true
+   end
    
    -------------------------------
    -- entity: sword_attack
@@ -167,7 +181,7 @@ player=dynamic:extend({
     if self.facing.x ~= 0 then self.sprite=3 else self.sprite=4 end
     if self.t > self.lifetime then self.done=true end
    
-    self.hitbox=nil
+    if self.t>1 then self.hitbox=box(0,0,0,0) end
    end
    
    function sword_attack:render()  

@@ -18,8 +18,8 @@ enemy=dynamic:extend({
   draw_order=4,
   death_time=15,
   health=1,
-  give=10,
-  take=1,
+  give=5,
+  take=2,
   ssize=1,
   svel=0.1
 })
@@ -36,11 +36,13 @@ function enemy:init()
 end
 
 function enemy:enemy_update()
-    if (self.hit) self.ht+=1 self.dir=zero_vector()
+    if (self.hit) self.ht+=1
 
     if self.ht > self.inv_t then
         self.hit=false
         self.ht=0
+    elseif self.ht>self.inv_t/3 then
+      self.dir=zero_vector()
     end
 end
 
@@ -57,7 +59,7 @@ function enemy:dead()
 end
 
 function enemy:damage(s)
-  if not self.hit then
+  if not self.hit and not self.invincible then
     self.health-=1
     s=s or 1
     
@@ -86,7 +88,7 @@ end
 
 function enemy_collide(self, e)
   if (self.state=="dead") return
-  if e:is_a("player") and e.damage and e:damage() then
+  if e:is_a("player") and e.damage and e:damage(self.take) then
     local d=e.pos-self.pos
     if #d>0.01 then d=d:norm() end
     e.vel=d*3
@@ -95,10 +97,10 @@ function enemy_collide(self, e)
 end
 
 function enemy:render()
-  self:shared_render()
+  shared_render(self)
 end
 
-function enemy:shared_render()
+function shared_render(self)
   if (self.hit and self.t%3==0) return
   local s=self.sprite
   s+=(self.t*self.svel)%self.ssize
@@ -125,6 +127,8 @@ bat=enemy:extend({
   fric=0.1,
   acc=2,
   health=2,
+  give=6,
+  take=5,
   sprite=55,
   c_tile=false
 })
@@ -162,6 +166,7 @@ spike=enemy:extend({
   tags={},
   draw_order=1,
   state="low",
+  take=5,
   low_t=60,
   mid_t=60,
   high_t=90
@@ -213,85 +218,6 @@ function spike:collide(e)
 end
 
 -------------------------------
--- entity: block
--------------------------------
-
--- block=enemy:extend({
---   hitbox=box(1,1,15,15),
---   state="idle",
---   maxvel=3,
---   basevel=3,
---   fric=1
--- })
-
--- block:spawns_from(41)
-
--- function block:init()
---   self.orig=v(self.pos.x,self.pos.y)
--- end
-
--- function block:idle()
---   self.sprite=41
---   if(not scene_player)return
---   local v=scene_player.pos-self.pos
---   local ang=atan2(v.x,v.y)
-  
---   if (ang > 0.24 and ang < 0.26) or
---     (ang > 0.49 and ang < 0.51) or
---     (ang > 0.74 and ang < 0.76) or
---     (ang > 0.99 or ang < 0.01) then
---     self:become("charging")
---     self.dir=v:norm()
---     if abs(self.dir.x)>abs(self.dir.y) then
---       self.dir.y=0
---     else 
---       self.dir.x=0
---     end
---   end
--- end
-
--- function block:charging()
---   self.sprite=43
---   if self.t>15 then
---     self:set_vel()
---   end
---   self.maxvel=self.basevel
--- end
-
--- function block:back()
---   if (self.t<15) return
---   self.sprite=41
---   local d=(self.orig-self.pos)
---   if #d < #self.vel then
---     self:become("idle")
---     self.pos=v(self.orig.x,self.orig.y)
---     self.vel=v(0,0)
---   else
---     self.dir=d:norm()
---     self:set_vel()
---   end
---   self.maxvel=self.basevel
--- end
-
--- function block:collide(e)
---   if (self.state=="charging")enemy_collide(self, e)
---   if self.state~="back" then
---     self.vel=v(0,0)
---     shake+=2
---   end
---   self:become("back")
--- end
-
--- function block:tcollide()
---   self:become("back")
---   shake+=2
--- end
-
--- function block:render()
---   spr(self.sprite, self.pos.x, self.pos.y, 2, 2)
--- end
-
--------------------------------
 -- entity: blob
 -------------------------------
 
@@ -328,51 +254,54 @@ end
 -------------------------------
 
 charger=enemy:extend({
-  collides_with={"player","attack","door","gate"},
-  hitbox=box(0,0,8,8),
+  collides_with={"player","door","gate"},
   state="choosing",
   maxvel=0.5,
   basevel=0.5,
   fric=1,
   mindist=8,maxdist=32,
-  health=3
+  health=3,
+  give=10,
+  take=10,
+  inv_t=90
 })
 
 charger:spawns_from(21)
 
 function charger:update()
-    self:enemy_update()
+  if (self.hit) self.ht+=1
 
-    local level_pos=level_index*128
-    local last_pos=self.pos:copy()
-    self.pos.x=clamp(level_pos.x,level_pos.x+120,self.pos.x)
-    self.pos.y=clamp(level_pos.y,level_pos.y+120,self.pos.y)
-    if(last_pos!=self.pos) self:become("frozen")
+  if self.ht > self.inv_t then
+      self.hit=false
+      self.ht=0
+  end
 
-    if not scene_player or 
-       self:is_in_any_state("frozen","charging","dead") then
-      return
-    end
+  local level_pos=level_index*128
+  local last_pos=self.pos:copy()
+  self.pos.x=clamp(level_pos.x,level_pos.x+120,self.pos.x)
+  self.pos.y=clamp(level_pos.y,level_pos.y+120,self.pos.y)
+  if(last_pos!=self.pos) self:become("frozen")
 
-    if self.hit then
-      self:become("frozen")
-    end
+  if not scene_player or 
+      self:is_in_any_state("frozen","charging","dead") then
+    return
+  end
 
-    local v=scene_player.pos-self.pos
-    local ang=atan2(v.x,v.y)
+  local v=scene_player.pos-self.pos
+  local ang=atan2(v.x,v.y)
 
-    if (ang > 0.24 and ang < 0.26) or
-        (ang > 0.49 and ang < 0.51) or
-        (ang > 0.74 and ang < 0.76) or
-        (ang > 0.99 or ang < 0.01) then
-        self:become("charging")
-        self.dir=v:norm()
-        if abs(self.dir.x)>abs(self.dir.y) then
-        self.dir.y=0
-        else 
-        self.dir.x=0
-        end
-    end
+  if (ang > 0.22 and ang < 0.28) or
+      (ang > 0.47 and ang < 0.53) or
+      (ang > 0.72 and ang < 0.78) or
+      (ang > 0.97 or ang < 0.03) then
+      self:become("charging")
+      self.dir=v:norm()
+      if abs(self.dir.x)>abs(self.dir.y) then
+      self.dir.y=0
+      else 
+      self.dir.x=0
+      end
+  end
 end
 
 function charger:charging()
@@ -380,6 +309,8 @@ function charger:charging()
         self:set_vel()
         self.sprite=22
         self.ssize=4
+    else
+      self.vel=zero_vector()
     end
     self.maxvel=self.basevel*4
 end
@@ -419,9 +350,11 @@ end
 
 function charger:collide(e)
   if self.state=="dead" then return end
-  if self.state!="frozen" then enemy_collide(self, e) end
-  if self.state=="charging" or self.state=="frozen" then 
-    shake=2 
+  if self.state!="frozen" then 
+    enemy_collide(self, e) 
+  end
+  if self.state=="charging" then 
+    shake=2
     self:become("frozen") 
     return 
   end
@@ -434,9 +367,15 @@ function charger:tcollide()
   self:become("choosing")
 end
 
+function charger:hit_reaction()
+  if (self.state!="dead") self:become("frozen")
+end
+
 function charger:render()
-  if (self.state=="frozen" and self.t%10>5) pal(8,7)
-  self:shared_render()
+  if self.state=="frozen" and self.t%10>5 then 
+    pal(8,7)
+  end
+  shared_render(self)
   reset_pal()
 end
 
@@ -452,6 +391,7 @@ laserdude=enemy:extend(
     health=4,
     give=4,
     take=2,
+    inv_t=60,
     fric=0.07,
     r=5
   }
@@ -466,10 +406,11 @@ function laserdude:shooting()
   if self.t==10 then
     shake+=5
 
-    e_add(bullet({dir=v(0,-1),pos=v(self.pos.x,self.pos.y-self.r/2)}))
-    e_add(bullet({dir=v(0,1),pos=v(self.pos.x,self.pos.y+self.r)}))
-    e_add(bullet({dir=v(1,0),pos=v(self.pos.x+self.r/2,self.pos.y)}))
-    e_add(bullet({dir=v(-1,0),pos=v(self.pos.x-self.r/2,self.pos.y)}))
+    local x,y,r=self.pos.x,self.pos.y
+    e_add(bullet({dir=v(0,-1),pos=v(x+4,y)}))
+    e_add(bullet({dir=v(0,1),pos=v(x+4,y+8)}))
+    e_add(bullet({dir=v(1,0),pos=v(x+8,y+4)}))
+    e_add(bullet({dir=v(-1,0),pos=v(x,y+4)}))
 
   end
   if self.t > 30 then
@@ -490,28 +431,19 @@ function laserdude:wondering()
   self:set_vel()
 end
 
-function laserdude:render()
-  if self.hit and self.t%3==0 then return end
-  circ(self.pos.x,self.pos.y,self.r,9)
-  print("\130",self.pos.x-3,self.pos.y-2,9)
-
-  if self.state=="dead" then
-    self:draw_dit(self.t,self.death_time,true)
-  end
-end
-
 -------------------------------
 -- entity: bullet
 -------------------------------
 
-bullet=dynamic:extend({
+bullet=enemy:extend({
   collides_with={"player"},
   tags={"bullet"},
   hitbox=box(-1,-1,1,1),
   maxvel=2,
+  take=5,
   c_tile=true,
   lifetime=30,
-  r=3
+  r=2
 })
 
 function bullet:update()
@@ -532,78 +464,11 @@ end
 
 function bullet:collide(e)
   add_explosion(self.pos,2,2,2,1,1,7,9,0)
-  if e.damage then
-    if e:damage() then
-      e.vel=self.dir*3
-    end
-  end
+  enemy_collide(self, e)
   self.done=true
 end
 
 function bullet:tcollide()
   add_explosion(self.pos,2,2,2,-3,-1,7,9,0)
   self.done=true
-end
-
--------------------------------
--- entity: spawner
--------------------------------
-
-enemy_list={charger, blob, laserdude, bat}
-
-spawner=enemy:extend({
-  collides_with={"player"},
-  state="spawn",
-  hitbox=box(0,0,8,8),
-  maxvel=2,
-  c_tile=true,
-  spawn_time=10*30,
-  svel=0.2,
-  spawn_number=2,
-  spawn_limit=5,
-  spawn_list={}
-})
-
-spawner:spawns_from(45)
-
-function spawner:cooldown()
-  self:become("spawn")
-end
-
-function spawner:spawn()
-  self:manage_spawn_list()
-  if self.t>=self.spawn_time then
-    if #self.spawn_list < self.spawn_limit then
-      for i=1,self.spawn_number do
-        local dirs={
-          v(-1,0),v(1,0),v(0,-1),v(0,1),
-          v(-1,-1),v(1,1),v(1,-1),v(-1,1)}
-        local mp=v(self.map_pos.x, self.map_pos.y)
-        local e=enemy_list[flr(rnd(#enemy_list)+1)]
-
-        mp+=dirs[flr(rnd(#dirs)+1)]
-        
-        local e_inst=e({
-          pos=mp*8,
-          vel=zero_vector(),
-          map_pos=mp
-        })
-        e_add(e_inst)
-        add(self.spawn_list, e_inst)
-
-        add_explosion(e_inst.pos,2,2,2,-3,-1,7,9,0)
-
-        if (e==bat) e_inst.attack_dist=10000
-      end
-    end
-    self:become("cooldown")
-  end
-end
-
-function spawner:manage_spawn_list()
-  for e in all(self.spawn_list) do
-    if e.done then
-      del(self.spawn_list, e)
-    end
-  end
 end

@@ -404,17 +404,22 @@ end
 -- entity: sword upgrade
 -------------------------------
 
-sword_upgrade=entity:extend({
+upgrade=entity:extend({
   collides_with={"player"},
-  hitbox=box(0,0,8,8)
+  hitbox=box(0,0,8,8),
+  type="sword"
 })
 
-sword_upgrade:spawns_from(4)
+upgrade:spawns_from(4,51)
 
-function sword_upgrade:update()
-  self.pos += v(0, 0.2*sin(self.t/80+0.5))
+function upgrade:init()
+  if (self.sprite==51) self.type="movement" self.ssize=2 self.svel=0.05
+  self.pos+=v(4,4)
+end
 
-  if self.t%3==0 then
+function upgrade:update()
+  self.pos += v(0, 0.5*sin(self.t/40+0.5))
+  if self.t%3==0 and self.type=="sword" then
     p_add(smoke({
           pos=v(self.pos.x+rnd(8),self.pos.y+8),
           c=12,r=1+rnd(1),v=0.15
@@ -422,10 +427,16 @@ function sword_upgrade:update()
   end
 end
 
-function sword_upgrade:collide(e)
-  dset(2,1)
-  e.sword_upgrade=true
+function upgrade:collide(e)
+  if self.type=="sword" then
+    dset(2,1)
+    e.sword_upgrade=true
+    add_explosion(self.pos,10,8,0,0,-8,12,7,0)
+  else
+    dset(3,1)
+    e:upgrade_movement()
+    add_explosion(self.pos,10,8,0,0,-8,9,7,5)
+  end
   self.done=true
   shake=5
-  add_explosion(self.pos,10,8,0,0,-8,12,7,0)
 end

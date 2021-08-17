@@ -3,7 +3,7 @@
 ------------------------------------
 
 debug=false
-global_timer = 60
+global_timer = 15
 gamestate = {}
 
 if not cartdata("mortatti_u1bg") then
@@ -37,7 +37,8 @@ function gamestate.update()
  do_collisions()
  p_update()
 
- add_time(-(time()-pft))
+ local t_add=-(time()-pft)
+ add_time(global_timer<10 and t_add*(global_timer*0.7/10+0.3) or t_add)
  global_timer=max(0, global_timer)
  pft=time()
 end
@@ -50,9 +51,12 @@ function gamestate.draw()
 
   camera()
   local st=tostr(flr(global_timer))
+  local c=7
+  if global_timer<5 then c=8 elseif global_timer<10 then c=9 end
+
   rectfill(1, 1, #st*4+3, 9, 0)
-  rect(1, 1, #st*4+3, 9, 7)
-  print(st, 3, 3, 7)
+  rect(1, 1, #st*4+3, 9, c)
+  print(st, 3, 3, c)
 end
 
 

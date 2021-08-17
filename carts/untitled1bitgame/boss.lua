@@ -8,14 +8,24 @@ boss=spawner:extend({
     health=10,
     spawn_time=1,
     obstacle_list={},
-    cd=60,
-    maxvel=1
+    cd=300,
+    maxvel=4,
+    basevel=4,
+    inv_t=48*30
 })
 
 boss:spawns_from(1)
 
 function boss:update()
-    self:enemy_update()
+    -- invincibility time
+    if (self.invincible) self.ht+=1
+
+    self.hit=false
+    if self.ht > self.inv_t then
+        self.invincible=false
+        self.ht=0
+    end
+
     self:set_vel()
     for e in all(self.obstacle_list) do
         e.timer+=1
@@ -38,13 +48,11 @@ function boss:update()
 end
 
 function boss:idle()
-    if self.hit and self.t>self.ht then 
-        self:become("spawn_obstacles")
-    end
+
 end
 
 function boss:cooldown()
-    if (self.t>self.cd) self:become("slowdown")
+    if (self.t>self.cd) self:become("spawn_obstacles")
 end
 
 function boss:choose_pos()
@@ -60,13 +68,16 @@ function boss:move()
     self.dir=(self.target_pos-self.pos):norm()
     local s=self.dir.x*last_dir.x+self.dir.y*last_dir.y
     if s<0 then
-        self:become("pot")
+        self:become("spawn_obstacles")
         self.pos=self.target_pos
         self.dir=zero_vector()
     end
 end
 
 function boss:hit_reaction()
+    self.invincible=true
+    self:spawn()
+    self:become("choose_pos")
     for e in all(self.obstacle_list) do
         e.ent.done=true
         del(self.obstacle_list,e)
@@ -95,7 +106,14 @@ function boss:spawn_obstacles()
     end
 
     if costatus(self.instantiate) == 'dead' then
-        self:become("idle")
+        self:become("cooldown")
+    end
+end
+
+function boss:render()
+    shared_render(self)
+    if self.invincible then
+        circ(self.pos.x+4,self.pos.y+4,10,9)
     end
 end
 
@@ -103,7 +121,6 @@ function instantiate_pattern(pattern, e_list)
     for j=1,#pattern do
         local pattern_list=split(pattern[j])
         for i=1,#pattern_list do
-            printh(pattern_list[i])
             local index=pattern_list[i]
             if (index==0) goto pattern_continue
             local instance=instances[index]
