@@ -3,7 +3,7 @@
 ------------------------------------
 
 player=dynamic:extend({
-    state="walking", vel=v(0,0),
+    state="walking", vel=zero_vector(),
     collides_with={"slowdown"},
     tags={"player"}, dir=v(1,0),
     hitbox=box(2,3,6,8),
@@ -61,7 +61,9 @@ player=dynamic:extend({
    end
    
    function player:walking()
-    self.dir=v(0,0)
+    self.dir=zero_vector()
+
+    if (self.pause) self.vel=zero_vector() return
    
     if self.hit and self.ht<self.inv_t/2 then self:set_vel() return end
    
@@ -77,7 +79,7 @@ player=dynamic:extend({
      self.vel/=1.4
     end
    
-    if (self.dir~=v(0,0)) self.last_dir=v(self.dir.x,self.dir.y)
+    if (self.dir~=zero_vector()) self.last_dir=v(self.dir.x,self.dir.y)
    
     if btnp(4) then 
      self:become("attacking")
@@ -99,7 +101,7 @@ player=dynamic:extend({
      e_add(self.attk)    
     end
    
-    self.vel=v(0,0)
+    self.vel=zero_vector()
     if self.attk.done then 
      self.attk=nil 
      self:become("walking")
@@ -107,7 +109,7 @@ player=dynamic:extend({
    end
    
    function player:dead()
-     self.vel=v(0,0)
+     self.vel=zero_vector()
      if (self.t>30*5) run(stat(6))
    end
    
@@ -120,7 +122,7 @@ player=dynamic:extend({
        self.sprite+=spd
        self.sprite=min(self.sprite,40)
      else
-       st=self.vel==v(0,0) and "idle" or "walking"
+       st=self.vel==zero_vector() and "idle" or "walking"
        flip=false
        spd=st=="idle" and 0 or 0.15
        self.sprite=st=="idle" and 32 or 33

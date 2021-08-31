@@ -18,7 +18,6 @@ fireplace:spawns_from(98)
 
 function fireplace:init()
   add(lightpoints, self)
-  self.fr=4
 end
 
 function fireplace:destroy()
@@ -135,7 +134,6 @@ end
 lightpoints = {}
 
 light_system=entity:extend({
- tags={"light_system"},
  draw_order=7,
  rects={},
  pt={0b0.1,0b0101101001011010.1,0b1111111111111111.1}
@@ -196,7 +194,7 @@ pedestal:spawns_from(78)
 
 function pedestal:init()
   e_add(key({
-     pos=v(self.pos.x+4,self.pos.y-10),
+     pos=self.pos + v(4,-10),
     }))
 end
 
@@ -255,16 +253,15 @@ end
 
 door=entity:extend({
   hitbox=box(0,0,16,16),
-  collides_with={"player"},
+  collides_with={"player","enemy"},
   tags={"door"},
-  state="closed",
   draw_order=1,
   persistent=true
 })
 
 door:spawns_from(12)
 
-function door:closed()
+function door:update()
   if self.t==0 then
     self.btn=e_find_tag("button")
     for b in all(self.btn) do
@@ -282,9 +279,8 @@ end
 
 function door:dead()
   if (self.t==60) self.done=true
-  if self.t%4 then
-    local p=self.pos+v(2+rnd(10), 2+rnd(10))
-    add_explosion(p,2)
+  if self.t%10 then
+    add_explosion(self.pos,2,10,10,-2,-2,nil,nil,1)
   end
 end
 
@@ -302,7 +298,7 @@ function door:collide(e) return c_push_out end
 -- entity: gate
 -------------------------------
 
-gate=entity:extend({
+gate=door:extend({
   hitbox=box(-8,-8,8,8),
   collides_with={"key", "player"},
   tags={"gate"},
@@ -321,14 +317,6 @@ end
 
 function gate:update()
   if(self.kcount<=0) self:become("dead")
-end
-
-function gate:dead()
-  if (self.t==60) self.done=true
-  if self.t%4 then
-    local p=self.pos-self.off+v(2+rnd(10), 2+rnd(10))
-    add_explosion(p,2)
-  end
 end
 
 function gate:render()
@@ -362,17 +350,17 @@ button=entity:extend({
   draw_order=1
 })
 
-button:spawns_from(21)
+button:spawns_from(61)
 
 function button:pressed()
   if self.t==0 then
     add_explosion(self.pos+v(0,6),3,8,2)
   end
-  self.sprite=22
+  self.sprite=62
 end
 
 function button:released()
-  self.sprite=21
+  self.sprite=61
 end
 
 function button:collide(e)
@@ -428,15 +416,15 @@ function upgrade:update()
 end
 
 function upgrade:collide(e)
+  local c=12
   if self.type=="sword" then
     dset(2,1)
     e.sword_upgrade=true
-    add_explosion(self.pos,10,8,0,0,-8,12,7,0)
   else
     dset(3,1)
     e:upgrade_movement()
-    add_explosion(self.pos,10,8,0,0,-8,9,7,5)
+    c=9
   end
+  add_explosion(self.pos,10,8,0,0,-8,c,7,5)
   self.done=true
-  shake=5
 end

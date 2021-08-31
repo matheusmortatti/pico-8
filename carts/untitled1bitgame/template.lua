@@ -745,7 +745,7 @@ function change_state(new_state)
 end
 
 function _init()
-  change_state(gamestate) 
+  change_state(gamestate)
 end
 
 function _update()

@@ -65,7 +65,7 @@ function enemy:damage(s)
     
     if (self.health <=0) then
     	self:become("dead")
-    	s*=2
+    	s*=1.3
     end
     
     add_time(self.give*s)
@@ -224,9 +224,8 @@ end
 blob=enemy:extend({
   state="moving",
   vel=zero_vector(),
-  hitbox=box(1,3,7,8),  
-  maxvel=0.5,
-  spd=1,
+  hitbox=box(1,3,7,8),
+  spd=0.9,
   sprite=7,
   health=1
 })
@@ -388,7 +387,7 @@ laserdude=enemy:extend(
     state="wondering",
     vel=zero_vector(),
     hitbox=box(-4,-4,4,4),
-    health=4,
+    health=2,
     give=4,
     take=2,
     inv_t=60,
