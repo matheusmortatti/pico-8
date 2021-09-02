@@ -4,5 +4,6 @@ lines={
     [130]={'oxe cade juninho?','saiu pra comprar\nleite e nunca\nmais voltou ...'},
     [131]={'todos dizem que\na chave vive\nem algum lugar\ndesta floresta','mas ninguem nunca\ntentou procura-la!'},
     [132]={'em todos esses anos\nnunca visitei o\nnoroeste ...', 'mas algum dia vou\nexplorar esse mundo!'},
-    [133]={'oloco bixo, fui\ncomprar leite e uns\nmonstros me atacaram!','vai pro oeste nao\nque da ruim!!'}
+    [133]={'oloco bixo, fui\ncomprar leite e uns\nmonstros me atacaram!','vai pro oeste nao\nque da ruim!!'},
+    [134]={'obrigado por jogar\na demo!!\nespero que tenha\ngostado ♥'}
 }

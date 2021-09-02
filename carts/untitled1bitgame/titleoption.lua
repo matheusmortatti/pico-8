@@ -5,6 +5,7 @@
 titleoption=dynamic:extend({
     hitbox=box(0,0,8,8),
     collides_with = {"player"},
+    tags={"titleoption"},
     c_tile=false,
     state="movein",
     maxvel=4,
@@ -19,7 +20,7 @@ titleoption=dynamic:extend({
 
 function titleoption:init()
     self.target_pos=self.pos:copy()
-    self.pos=v(level_index.x*128+128,self.pos.y)
+    self.pos=v(level_index.x*128+160,self.pos.y)
 
     local width=#self.text*4+2
     self.hitbox = box(-width/2, 0, width/2, 8)
@@ -27,8 +28,12 @@ end
 
 function titleoption:update()
     if self.selected and (btnp(4) or btnp(5)) then
-        if (self.select_func) self.select_func()
+        for t in all(e_find_tag("titleoption")) do
+            t:become("moveout")
+        end
         self:become("moveout")
+
+        if (self.select_func) self.select_func()
     end
 end
 

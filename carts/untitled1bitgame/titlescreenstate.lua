@@ -6,9 +6,9 @@ gamestate = {}
 
 function gamestate.init()
     
-  local has_save_file=cartdata("mortatti_u1bg")
+  has_save_file=cartdata("u1bg")
   if not has_save_file then
-      dset(0,3)
+    reset_cartdata()
   end
 
   for i=0,127 do
@@ -24,32 +24,8 @@ function gamestate.init()
     pos=level_index*128
    }
  ))
-
-
- e_add(titleoption({
-     pos=level_index*128+v(64,64),
-     text=has_save_file and "continue" or "new game",
-     select_func=function()
-        e_add(fade({
-            func=function()
-                load("u1bg.p8", nil, "72,22")
-            end
-        }))
-     end
- }))
-
- e_add(titleoption({
-  pos=level_index*128+v(64,76),
-  text="quit",
-  select_func=function()
-     e_add(fade({
-         func=function()
-             stop()
-         end
-     }))
-  end
-}))
  
+ load_main_options()
  reset_pal()
 end
 
@@ -68,4 +44,70 @@ function gamestate.draw()
  p_draw_all()
 
   camera()
+end
+
+function load_main_options()
+  if has_save_file then
+    e_add(titleoption({
+      pos=level_index*128+v(64,64),
+      text="continue",
+      select_func=function()
+        e_add(fade({
+            func=function()
+                load("u1bg.p8", nil, "72,22")
+            end
+        }))
+      end
+    }))
+  end
+
+  e_add(titleoption({
+    pos=level_index*128+v(64,80),
+    text="new game",
+    select_func=function()
+      load_ng_options()
+    end
+  }))
+
+  e_add(titleoption({
+    pos=level_index*128+v(64,96),
+    text="quit",
+    select_func=function()
+      e_add(fade({
+          func=function()
+              stop()
+          end
+      }))
+    end
+  }))
+end
+
+function load_ng_options()
+  e_add(titleoption({
+    pos=level_index*128+v(64,64),
+    text="start new game",
+    select_func=function()
+      e_add(fade({
+          func=function()
+            reset_cartdata()
+            load("u1bg.p8", nil, "72,22")
+          end
+      }))
+    end
+  }))
+
+  e_add(titleoption({
+    pos=level_index*128+v(64,80),
+    text="back",
+    select_func=function()
+      load_main_options()
+    end
+  }))
+end
+
+function reset_cartdata()
+  dset(0,1)
+  for i=1,63 do
+    dset(i,0)
+  end
 end

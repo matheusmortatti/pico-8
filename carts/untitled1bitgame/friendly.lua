@@ -102,7 +102,7 @@ old_man=dynamic:extend({
  c_tile=false
 })
 
-old_man:spawns_from(2,128,129,130,131,132,133)
+old_man:spawns_from(128,129,130,131,132,133,134)
 
 function old_man:init()
     self.toff=rnd(30) 

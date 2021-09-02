@@ -4,8 +4,8 @@
 
 gamestate = {}
 
-if not cartdata("mortatti_u1bg") then
-  dset(0,3)
+if not cartdata("u1bg") then
+  dset(0,1)
 end
 
 function gamestate.init()

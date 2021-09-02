@@ -446,12 +446,12 @@ bullet=enemy:extend({
 
 function bullet:update()
   self:set_vel()
-  if self.t%5==0 then
-    local s=create_smoke(self.pos,2,2,1,1,7,9)
+  -- if self.t%5==0 then
+  --   local s=create_smoke(self.pos,2,2,1,1,7,9)
     
-    s.vel=v(rnd(1)-0.5,rnd(1)-0.5)
-    p_add(s)
-  end
+  --   s.vel=v(rnd(1)-0.5,rnd(1)-0.5)
+  --   p_add(s)
+  -- end
 
   if (self.t > self.lifetime) self.done=true
 end

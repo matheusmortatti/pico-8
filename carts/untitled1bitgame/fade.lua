@@ -2,7 +2,8 @@ fade=entity:extend({
     pt={[0]=0b1111111111111111.1,0b1101101111011011.1,0b0101101001011010.1,0b0.1,0b0.1},
     ll=0,
     func=nil,
-    step=1
+    step=1,
+    draw_order=7
 })
 
 function fade:update()
