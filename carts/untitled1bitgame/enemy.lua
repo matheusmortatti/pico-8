@@ -18,7 +18,7 @@ enemy=dynamic:extend({
   draw_order=4,
   death_time=15,
   health=1,
-  give=5,
+  give=3,
   take=2,
   ssize=1,
   svel=0.1
@@ -60,18 +60,19 @@ end
 
 function enemy:damage(s)
   if not self.hit and not self.invincible then
-    self.health-=1
     s=s or 1
+    self.health-=s
     
     if (self.health <=0) then
     	self:become("dead")
     	s*=1.3
     end
     
-    add_time(self.give*s)
+    local t=ceil(self.give*s)
+    add_time(t)
     p_add(ptext({
       pos=v(self.pos.x-10,self.pos.y),
-      txt="+"..self.give*s,
+      txt="+"..t,
       lifetime=45
       }))
     self.hit=true
@@ -121,7 +122,7 @@ bat=enemy:extend({
   collides_with={"player"},
   draw_order=5,
   state="idle",
-  attack_dist=10*60,
+  attack_dist=600,
   vel=zero_vector(),
   maxvel=0.3,  
   fric=0.1,
@@ -136,23 +137,50 @@ bat=enemy:extend({
 bat:spawns_from(55)
 
 function bat:idle()
-  if not scene_player then return end
   local dist=#dist_vector(scene_player.pos,self.pos)
   if dist < self.attack_dist then 
     self:become("attacking")
-    self.sprite=53
-    self.ssize=2
-    self.svel=0.05
   end
 end
 
 function bat:attacking()
-  if not scene_player then return end
+  self.sprite=53
+  self.ssize=2
+  self.svel=0.05
+  
+  self.pos += v(0, 0.5*sin(self.t/40+0.5))
+  self:follow_player()
+end
 
+function bat:follow_player()
   self.dir=dist_vector(scene_player.pos,self.pos):norm()
   self:set_vel()
+end
 
-  self.pos += v(0, 0.5*sin(self.t/40+0.5))
+-------------------------------
+-- entity: blob
+-------------------------------
+
+blob=bat:extend({
+  state="idle",
+  vel=zero_vector(),
+  hitbox=box(1,3,7,8),
+  spd=0.9,
+  sprite=7,
+  health=1,
+  give=5,
+  attack_dist=1200
+})
+
+blob:spawns_from(7)
+
+function blob:attacking()
+  self.fric=0.05
+  self.ssize=3
+  self.svel=0.15
+
+  self:follow_player()
+  self.maxvel = self.spd*(cos(self.t/20)+1)/2 + 0.1
 end
 
 -------------------------------
@@ -175,26 +203,15 @@ spike=enemy:extend({
 spike:spawns_from(116,115)
 
 function spike:init()
-  if (self.sprite==115) self.ps="waiting" self:become("waiting")
-end
-
-function spike:waiting()
-  if self.p==nil and self.pv~=nil then
-    self:become("high")
-    add_explosion(self.pos+v(0,6),3,8,2)
-  end
-  self.pv=self.p
-  self.p=nil
+  if (self.sprite==115) self.high_t*=2 self.type=1 self:become("waiting")
 end
 
 function spike:low()
-  self.hitbox=nil
   self.sprite=nil
   if (self.t>self.low_t) self:become("mid")
 end
 
 function spike:mid()
-  self.hitbox=nil
   self.sprite=115
   if self.t>self.mid_t then 
     self:become("high")
@@ -203,49 +220,28 @@ function spike:mid()
 end
 
 function spike:high()
-  self.hitbox = self.hb
   self.sprite=116
-  if (self.t>self.high_t and self.ps~="waiting") self:become("low")
-
+  if self.t>self.high_t then 
+    if self.type==1 then
+      self:become("waiting")
+      self.sprite=115
+    else
+      self:become("low")
+    end
+  end
 end
 
 function spike:collide(e)
   if self.state=="high" then
     enemy_collide(self, e)
-  elseif self.state=="waiting" then
-    self.p=e
   end
 end
 
--------------------------------
--- entity: blob
--------------------------------
-
-blob=enemy:extend({
-  state="moving",
-  vel=zero_vector(),
-  hitbox=box(1,3,7,8),
-  spd=0.9,
-  sprite=7,
-  health=1
-})
-
-blob:spawns_from(7)
-
-function blob:init()
-  self.fric=0.05
-  self.ssize=3
-  self.svel=0.15
-end
-
-function blob:moving()
-  if not scene_player then return end
-
-  self.dir=(scene_player.pos-self.pos):norm()
-
-  self.maxvel = self.spd*(cos(self.t/20)+1)/2 + 0.1
-
-  self:set_vel()
+function spike:end_collision(e)
+  if self.state=="waiting" then
+    self:become("high")
+    add_explosion(self.pos+v(0,6),3,8,2)
+  end
 end
 
 -------------------------------
@@ -260,12 +256,16 @@ charger=enemy:extend({
   fric=1,
   mindist=8,maxdist=32,
   health=3,
-  give=10,
+  give=8,
   take=10,
   inv_t=90
 })
 
 charger:spawns_from(21)
+
+function charger:init()
+  self.level_pos=level_index*128
+end
 
 function charger:update()
   if (self.hit) self.ht+=1
@@ -275,10 +275,9 @@ function charger:update()
       self.ht=0
   end
 
-  local level_pos=level_index*128
   local last_pos=self.pos:copy()
-  self.pos.x=clamp(level_pos.x,level_pos.x+120,self.pos.x)
-  self.pos.y=clamp(level_pos.y,level_pos.y+120,self.pos.y)
+  self.pos.x=clamp(self.level_pos.x,self.level_pos.x+120,self.pos.x)
+  self.pos.y=clamp(self.level_pos.y,self.level_pos.y+120,self.pos.y)
   if(last_pos!=self.pos) self:become("frozen")
 
   if not scene_player or 

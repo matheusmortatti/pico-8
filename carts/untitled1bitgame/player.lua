@@ -137,6 +137,7 @@ player=dynamic:extend({
    end
    
    function player:damage(dmg)
+    dmg=self.sword_upgrade and dmg*1.5 or dmg
     if not self.hit then
      p_add(ptext({
        pos=v(self.pos.x-10,self.pos.y),
@@ -183,7 +184,7 @@ player=dynamic:extend({
     if self.facing.x ~= 0 then self.sprite=3 else self.sprite=4 end
     if self.t > self.lifetime then self.done=true end
    
-    if self.t>1 then self.hitbox=box(0,0,0,0) end
+    if self.t>5 then self.hitbox=box(0,0,0,0) end
    end
    
    function sword_attack:render()  

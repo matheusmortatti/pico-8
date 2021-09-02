@@ -47,10 +47,12 @@ function dialogue_box:update()
 
     if self.t%self.tspd == 0 then
         self.cursor += 1
+        self.current_line_size+=1
         
-        self.line_size = max(self.cursor/(self.offset+1)-1, self.line_size)
+        self.line_size = max(self.current_line_size, self.line_size)
         if sub(self.lines[self.index], self.cursor, self.cursor) == '\n' then
-        self.offset += 1
+          self.offset += 1
+          self.current_line_size=0
         end
     end
 end
@@ -62,7 +64,7 @@ end
 function dialogue_box:start()
   self.running=true
   self.index=1
-  self.cursor=0 self.offset=0 self.line_size=0
+  self.cursor=0 self.offset=0 self.line_size=0 self.current_line_size=0
 end
 
 function dialogue_box:next()
@@ -72,14 +74,17 @@ function dialogue_box:next()
   if (self.cursor != 0 and self.cursor < #self.lines[self.index]) return
 
   self.index+=1
-  self.cursor=0 self.offset=0 self.line_size=0
+  self.cursor=0 self.offset=0 self.line_size=0 self.current_line_size=0
   if (self.index>#self.lines) self:stop()
 end
 
 function dialogue_box:render()
   if (not self.running) return
-  local x,y=self.pos.x-10,self.pos.y-5-self.base_offset*self.offset
-  if (self.cursor ~= 0) rectfill(x, y-1, x+4*self.line_size, y+6*(self.offset+1), 0)
+  local x,y=self.pos.x-10,self.pos.y-8-self.base_offset*self.offset
+  if self.cursor ~= 0 then 
+    rectfill(x-1, y-2, x+4*self.line_size, y+6*(self.offset+1), 0)
+    rect(x-2,y-2,x+4*self.line_size+1, y+6*(self.offset+1)+1, 7)
+  end
   print(sub(self.lines[self.index], 0, self.cursor), x, y, 7)
 end
 
@@ -91,15 +96,15 @@ old_man=dynamic:extend({
  collides_with={"player"},
  tags={"old_man"}, dir=v(1,0),
  hitbox=box(-8,-8,16,16),
- sprite=0,
  draw_order=3,
  ssize=3,
- inv_sp=30
+ inv_sp=30,
+ c_tile=false
 })
 
-old_man:spawns_from(2,128,129)
+old_man:spawns_from(2,128,129,130,131,132,133)
 
-function old_man:init() 
+function old_man:init()
     self.toff=rnd(30) 
     self.dialog=e_add(
         dialogue_box({
@@ -123,7 +128,7 @@ function old_man:render()
  s=s+flr(self.ssize*((self.t+self.toff)%self.inv_sp)/self.inv_sp)
  spr(s,self.pos.x, self.pos.y)
  if self.p_near and not self.dialog.running then
-    print("x",self.pos.x+3,self.pos.y-6)
+    print("x",self.pos.x+3,self.pos.y-6,7)
  end
 end
 
@@ -299,7 +304,7 @@ function door:collide(e) return c_push_out end
 -------------------------------
 
 gate=door:extend({
-  hitbox=box(-8,-8,8,8),
+  hitbox=box(0,0,16,16),
   collides_with={"key", "player"},
   tags={"gate"},
   kspr=13,
@@ -311,7 +316,6 @@ gate=door:extend({
 gate:spawns_from(11)
 
 function gate:init() 
-  self.pos+=self.off
   self.kcount=dget(0)
 end
 
@@ -320,11 +324,11 @@ function gate:update()
 end
 
 function gate:render()
-  spr(self.sprite, self.pos.x-self.off.x, self.pos.y-self.off.y, 2, 2)
+  spr(self.sprite, self.pos.x, self.pos.y, 2, 2)
 
   local off=-1
   for i=1,self.kcount do
-    spr(self.kspr, self.pos.x-self.off.x+off, self.pos.y-self.off.y+6)
+    spr(self.kspr, self.pos.x+off, self.pos.y+6)
     off+=5
   end
 end
