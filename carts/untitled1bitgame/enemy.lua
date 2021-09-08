@@ -28,7 +28,7 @@ enemy:spawns_from(19)
 
 function enemy:spawn_condition(em)
   if (not em) return true
-  return time()-em[1]>self.give*self.health/2
+  return time()-em[1]>self.give*self.health*2
 end
 
 function enemy:init()
@@ -68,7 +68,7 @@ function enemy:damage(s)
     	s*=1.3
     end
     
-    local t=ceil(self.give*s)
+    local t=ceil(self.give*s*multiplier)
     add_time(t)
     p_add(ptext({
       pos=v(self.pos.x-10,self.pos.y),
@@ -125,8 +125,8 @@ bat=enemy:extend({
   attack_dist=600,
   vel=zero_vector(),
   maxvel=0.3,  
-  fric=0.1,
-  acc=2,
+  fric=0.05,
+  acc=0.05,
   health=2,
   give=6,
   take=5,
@@ -169,6 +169,7 @@ blob=bat:extend({
   sprite=7,
   health=1,
   give=5,
+  c_tile=true,
   attack_dist=1200
 })
 
@@ -258,7 +259,9 @@ charger=enemy:extend({
   health=3,
   give=8,
   take=10,
-  inv_t=90
+  inv_t=90,
+  bh=box(-128,-2,128,10),
+  bv=box(-2,-128,10,128)
 })
 
 charger:spawns_from(21)
@@ -285,20 +288,16 @@ function charger:update()
     return
   end
 
-  local v=scene_player.pos-self.pos
-  local ang=atan2(v.x,v.y)
-
-  if (ang > 0.22 and ang < 0.28) or
-      (ang > 0.47 and ang < 0.53) or
-      (ang > 0.72 and ang < 0.78) or
-      (ang > 0.97 or ang < 0.03) then
-      self:become("charging")
-      self.dir=v:norm()
-      if abs(self.dir.x)>abs(self.dir.y) then
-      self.dir.y=0
-      else 
-      self.dir.x=0
-      end
+  local p=c_get_entity(scene_player)
+  if p.b:overlaps(self.bv:translate(self.pos)) or
+     p.b:overlaps(self.bh:translate(self.pos))then
+    self:become("charging")
+    self.dir=(scene_player.pos-self.pos):norm()
+    if abs(self.dir.x)>abs(self.dir.y) then
+    self.dir.y=0
+    else 
+    self.dir.x=0
+    end
   end
 end
 
@@ -375,6 +374,7 @@ function charger:render()
   end
   shared_render(self)
   reset_pal()
+  local bv,bh=self.bv:translate(self.pos),self.bh:translate(self.pos)
 end
 
 -------------------------------
@@ -385,12 +385,12 @@ laserdude=enemy:extend(
   {
     state="wondering",
     vel=zero_vector(),
-    hitbox=box(-4,-4,4,4),
+    hitbox=box(1,1,6,6),
     health=2,
     give=4,
     take=2,
     inv_t=60,
-    fric=0.07,
+    fric=0.01,acc=0.05,
     r=5
   }
 )
@@ -401,7 +401,7 @@ function laserdude:shooting()
   self.vel=zero_vector()
 
   local llength=5
-  if self.t==10 then
+  if self.t%7==0 then
     shake+=5
 
     local x,y,r=self.pos.x,self.pos.y
@@ -440,7 +440,7 @@ bullet=enemy:extend({
   maxvel=2,
   take=5,
   c_tile=true,
-  lifetime=30,
+  lifetime=60,
   r=2
 })
 
@@ -457,16 +457,16 @@ function bullet:update()
 end
 
 function bullet:render()
-  circfill(self.pos.x,self.pos.y,self.r,9)
+  circfill(self.pos.x,self.pos.y,self.r,8)
 end
 
 function bullet:collide(e)
-  add_explosion(self.pos,2,2,2,1,1,7,9,0)
+  add_explosion(self.pos,2,2,2,1,1,7,8,0)
   enemy_collide(self, e)
   self.done=true
 end
 
 function bullet:tcollide()
-  add_explosion(self.pos,2,2,2,-3,-1,7,9,0)
+  add_explosion(self.pos,2,2,2,-3,-1,7,8,0)
   self.done=true
 end

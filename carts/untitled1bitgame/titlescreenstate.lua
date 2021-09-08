@@ -84,12 +84,27 @@ end
 
 function load_ng_options()
   e_add(titleoption({
-    pos=level_index*128+v(64,64),
-    text="start new game",
+    pos=level_index*128+v(64,48),
+    text="easy",
     select_func=function()
       e_add(fade({
           func=function()
             reset_cartdata()
+            dset(10,1.3)
+            load("u1bg.p8", nil, "72,22")
+          end
+      }))
+    end
+  }))
+
+  e_add(titleoption({
+    pos=level_index*128+v(64,64),
+    text="normal",
+    select_func=function()
+      e_add(fade({
+          func=function()
+            reset_cartdata()
+            dset(10,1)
             load("u1bg.p8", nil, "72,22")
           end
       }))
@@ -98,6 +113,20 @@ function load_ng_options()
 
   e_add(titleoption({
     pos=level_index*128+v(64,80),
+    text="hard",
+    select_func=function()
+      e_add(fade({
+          func=function()
+            reset_cartdata()
+            dset(10,0.7)
+            load("u1bg.p8", nil, "72,22")
+          end
+      }))
+    end
+  }))
+
+  e_add(titleoption({
+    pos=level_index*128+v(64,96),
     text="back",
     select_func=function()
       load_main_options()

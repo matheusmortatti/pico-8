@@ -137,7 +137,7 @@ player=dynamic:extend({
    end
    
    function player:damage(dmg)
-    dmg=self.sword_upgrade and dmg*1.5 or dmg
+    dmg=self.sword_upgrade and dmg*1.2 or dmg
     if not self.hit then
      p_add(ptext({
        pos=v(self.pos.x-10,self.pos.y),

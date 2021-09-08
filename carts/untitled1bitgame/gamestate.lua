@@ -10,8 +10,10 @@ end
 
 function gamestate.init()
 
+  multiplier=dget(10)
+
   local str_pos=split(stat(6))
-  if #str_pos==2 then
+  if #str_pos>=2 then
     local player_pos=v(str_pos[1],str_pos[2])
     level_index=v(flr(player_pos.x/16),flr(player_pos.y/16))
 
@@ -21,14 +23,14 @@ function gamestate.init()
     })
 
     e_add(scene_player)
-  else
-    for i=0,127 do
-      for j=0,63 do
-        if mget(i,j)==32 then
-          level_index=v(flr(i/16),flr(j/16))
-        end
-      end
-    end
+  -- else
+  --   for i=0,127 do
+  --     for j=0,63 do
+  --       if mget(i,j)==32 then
+  --         level_index=v(flr(i/16),flr(j/16))
+  --       end
+  --     end
+  --   end
   end
 
   
@@ -57,6 +59,7 @@ function gamestate.update()
  local t_add=-(time()-pft)
  add_time(global_timer<10 and t_add*(global_timer*0.7/10+0.3) or t_add)
  global_timer=max(0, global_timer)
+ global_timer=min(100,global_timer)
  pft=time()
 end
 
