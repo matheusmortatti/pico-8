@@ -390,6 +390,7 @@ laserdude=enemy:extend(
     give=4,
     take=2,
     inv_t=60,
+    sprite=10,
     fric=0.01,acc=0.05,
     r=5
   }

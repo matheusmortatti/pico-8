@@ -34,7 +34,7 @@ end
 dialogue_box=entity:extend({
     is_talking=false,
     cursor=0,
-    tspd=3,
+    tspd=2,
     base_offset = 6,
     offset = 0,
     line_size=0,

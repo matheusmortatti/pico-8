@@ -16,6 +16,10 @@ boss=spawner:extend({
 
 boss:spawns_from(1)
 
+function boss:init()
+    
+end
+
 function boss:update()
     -- invincibility time
     if (self.invincible) self.ht+=1
@@ -47,6 +51,35 @@ function boss:update()
     end
 end
 
+function boss:spawn_level(lx,ly)
+    local tx,ty=lx*16+1,ly*16+2 
+
+    for i=0,13 do
+        for j=0,12 do
+            local t=mget(tx+i,ty+j)
+            if t!=0 then
+                mset(level_index.x*16+1+i,level_index.y*16+2+j,t)
+            end
+        end
+    end
+end
+
+function boss:fadeout()
+    if self.t==1 then
+        self.f = e_add(fade({
+            func=function()
+                local li=level_index+v(1,0)
+                self:spawn_level(li.x,li.y)
+                e_add(fade({
+                    step=-1,ll=3
+                }))
+            end
+        }))
+    end
+
+    print(self.f.done)
+end
+
 function boss:idle()
 
 end
@@ -68,7 +101,7 @@ function boss:move()
     self.dir=(self.target_pos-self.pos):norm()
     local s=self.dir.x*last_dir.x+self.dir.y*last_dir.y
     if s<0 then
-        self:become("spawn_obstacles")
+        self:become("fadeout")
         self.pos=self.target_pos
         self.dir=zero_vector()
     end
@@ -76,7 +109,7 @@ end
 
 function boss:hit_reaction()
     self.invincible=true
-    self:spawn()
+    -- self:spawn()
     self:become("choose_pos")
     for e in all(self.obstacle_list) do
         e.ent.done=true
@@ -218,7 +251,7 @@ pot=entity:extend({
     hitbox=box(0,0,8,8),
     state="whole",
     draw_order=1,
-    collides_with={"player","attack"},
+    collides_with={"player","attack","enemy"},
     sprite=17
 })
 
@@ -228,7 +261,7 @@ function pot:collide(e)
         if e:is_a("attack") then
             self:become("broken")
             self.sprite+=1
-        elseif e:is_a("player") then
+        else
             return c_push_out
         end
     end

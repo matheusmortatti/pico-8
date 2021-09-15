@@ -53,6 +53,7 @@ function spawner:spawn()
         add_explosion(e_inst.pos,2,2,2,-3,-1,7,9,0)
 
         if (e==bat) e_inst.attack_dist=10000
+        if (e==laserdude)e.sprite=10
     end
 end
 
