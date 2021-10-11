@@ -104,7 +104,7 @@ function load_ng_options()
       e_add(fade({
           func=function()
             reset_cartdata()
-            dset(10,1)
+            dset(10,1.1)
             load("u1bg.p8", nil, "72,22")
           end
       }))
@@ -118,7 +118,7 @@ function load_ng_options()
       e_add(fade({
           func=function()
             reset_cartdata()
-            dset(10,0.7)
+            dset(10,0.8)
             load("u1bg.p8", nil, "72,22")
           end
       }))

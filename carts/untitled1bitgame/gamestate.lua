@@ -23,14 +23,14 @@ function gamestate.init()
     })
 
     e_add(scene_player)
-  -- else
-  --   for i=0,127 do
-  --     for j=0,63 do
-  --       if mget(i,j)==32 then
-  --         level_index=v(flr(i/16),flr(j/16))
-  --       end
-  --     end
-  --   end
+  else
+    for i=0,127 do
+      for j=0,63 do
+        if mget(i,j)==32 then
+          level_index=v(flr(i/16),flr(j/16))
+        end
+      end
+    end
   end
 
   

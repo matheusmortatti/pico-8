@@ -18,7 +18,7 @@ enemy=dynamic:extend({
   draw_order=4,
   death_time=15,
   health=1,
-  give=3,
+  give=2.5,
   take=2,
   ssize=1,
   svel=0.1
@@ -65,18 +65,17 @@ function enemy:damage(s)
     
     if (self.health <=0) then
     	self:become("dead")
-    	s*=1.3
+    	s*=2
+      shake=2
     end
     
     local t=ceil(self.give*s*multiplier)
     add_time(t)
     p_add(ptext({
       pos=v(self.pos.x-10,self.pos.y),
-      txt="+"..t,
-      lifetime=45
+      txt="+"..t
       }))
     self.hit=true
-    shake=5
     self.ht=0
 
     if (self.hit_reaction) self:hit_reaction()
@@ -93,6 +92,7 @@ function enemy_collide(self, e)
     local d=e.pos-self.pos
     if #d>0.01 then d=d:norm() end
     e.vel=d*3
+    self.vel=zero_vector()
     add_time(-self.take)
   end
 end
@@ -102,7 +102,7 @@ function enemy:render()
 end
 
 function shared_render(self)
-  if (self.hit and self.t%3==0) return
+  if (self.hit and self.t%8>=4 and self.state!="dead") return
   local s=self.sprite
   s+=(self.t*self.svel)%self.ssize
   self.flip=self.dir.x<0 and true or false
@@ -128,7 +128,7 @@ bat=enemy:extend({
   fric=0.05,
   acc=0.05,
   health=2,
-  give=6,
+  give=2,
   take=5,
   sprite=55,
   c_tile=false
@@ -167,8 +167,8 @@ blob=bat:extend({
   hitbox=box(1,3,7,8),
   spd=0.9,
   sprite=7,
-  health=1,
-  give=5,
+  health=2,
+  give=1.5,
   c_tile=true,
   attack_dist=1200
 })
@@ -254,11 +254,11 @@ charger=enemy:extend({
   state="choosing",
   maxvel=0.5,
   basevel=0.5,
-  fric=1,
+  fric=0.05,
   mindist=8,maxdist=32,
   health=3,
-  give=8,
-  take=10,
+  give=5,
+  take=8,
   inv_t=90,
   bh=box(-128,-2,128,10),
   bv=box(-2,-128,10,128)
@@ -341,7 +341,8 @@ end
 function charger:frozen()
   self.sprite=21
   self.ssize=1
-  self.vel=zero_vector()
+  self.dir=zero_vector()
+  self:set_vel()
   if (self.t>30) self:become("choosing")
 end
 
@@ -351,7 +352,6 @@ function charger:collide(e)
     enemy_collide(self, e) 
   end
   if self.state=="charging" then 
-    shake=2
     self:become("frozen") 
     return 
   end
@@ -360,7 +360,7 @@ end
 
 function charger:tcollide()
   if self.state=="dead" or self.state=="frozen" then return end
-  if self.state=="charging" then shake=2 self:become("frozen") return end
+  if self.state=="charging" then self:become("frozen") return end
   self:become("choosing")
 end
 
@@ -387,7 +387,7 @@ laserdude=enemy:extend(
     vel=zero_vector(),
     hitbox=box(1,1,6,6),
     health=2,
-    give=4,
+    give=3,
     take=2,
     inv_t=60,
     sprite=10,
@@ -403,7 +403,7 @@ function laserdude:shooting()
 
   local llength=5
   if self.t%7==0 then
-    shake+=5
+    shake=2
 
     local x,y,r=self.pos.x,self.pos.y
     e_add(bullet({dir=v(0,-1),pos=v(x+4,y)}))

@@ -4,6 +4,7 @@
 
 debug=false
 global_timer = 60
+framerate=60
 
 -->8
 -------------------------------

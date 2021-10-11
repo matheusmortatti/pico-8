@@ -114,7 +114,7 @@ player=dynamic:extend({
    end
    
    function player:render()
-     if (self.hit and self.t%3==0) return
+    if (self.hit and self.t%6>3) pal(7,8)
    
      local st,flip,spd="idle",false,0.1
    
@@ -134,14 +134,16 @@ player=dynamic:extend({
      end
    
     spr(self.sprite, self.pos.x, self.pos.y, 1, 1, flip)
+    pal(7,7)
    end
    
    function player:damage(dmg)
     dmg=self.sword_upgrade and dmg*1.2 or dmg
     if not self.hit then
+      sleep=5
      p_add(ptext({
        pos=v(self.pos.x-10,self.pos.y),
-       txt="-"..dmg
+       txt="-"..dmg,c=8
      }))
      self.ht=0
      self.hit=true
@@ -184,7 +186,7 @@ player=dynamic:extend({
     if self.facing.x ~= 0 then self.sprite=3 else self.sprite=4 end
     if self.t > self.lifetime then self.done=true end
    
-    if self.t>5 then self.hitbox=box(0,0,0,0) end
+    --if self.t>5 then self.hitbox=box(0,0,0,0) end
    end
    
    function sword_attack:render()  
@@ -193,14 +195,15 @@ player=dynamic:extend({
     local nf=v(abs(self.facing.y),abs(self.facing.x))
     local off=v(abs(self.facing.x),abs(self.facing.y))*4+v(4,4)
     local pos=self.pos+nf*2
-    if self.t >= 3*self.lifetime/4 then
-     self:draw_dit((self.lifetime-self.t),(self.lifetime/4))    
+    local t=3*self.lifetime/4
+    if self.t >= t then
+     self:draw_dit(self.t-t,self.lifetime/4,true)    
     end
    end
    
    function sword_attack:collide(e)
     if e:is_a("enemy") and not e.hit then
-     local multiplier=self.upg and 2 or 1
+     local multiplier=self.upg and 1.3 or 1
      e:damage(self.dmg*multiplier)
      local allowed_dirs={
       v(-1,0)==self.facing,

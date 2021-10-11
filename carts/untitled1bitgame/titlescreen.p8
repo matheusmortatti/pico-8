@@ -11,7 +11,6 @@ __lua__
 #include friendly.lua
 #include slowdown.lua
 #include cart_change.lua
-#include lines.lua
 #include fade.lua
 
 __gfx__

@@ -116,7 +116,7 @@ end
  -- if the entity was in that
  -- state already
 function entity:become(state)
-  if state~=self.state then
+  if state~=self.state and self.state!="dead" then
    self.state,self.t=state,0
   end
 end
@@ -705,30 +705,32 @@ function shallow_copy(obj)
  end
  return cpy
 end
+
 ------------------------------------
 -- func scheduler
 ------------------------------------
 
-invoke_func = {}
-function invoke(func,t,p)
-  add(invoke_func,{func,0,t,p})
-end
+-- invoke_func = {}
+-- function invoke(func,t,p)
+--   add(invoke_func,{func,0,t,p})
+-- end
 
-function update_invoke()
-  for i=#invoke_func,1,-1 do
-    invoke_func[i][2]+=1
-    if invoke_func[i][2]>=invoke_func[i][3] then
-      invoke_func[i][1](invoke_func[i][4])
-      del(invoke_func,invoke_func[i])
-    end
-  end
-end
+-- function update_invoke()
+--   for i=#invoke_func,1,-1 do
+--     invoke_func[i][2]+=1
+--     if invoke_func[i][2]>=invoke_func[i][3] then
+--       invoke_func[i][1](invoke_func[i][4])
+--       del(invoke_func,invoke_func[i])
+--     end
+--   end
+-- end
 
 ------------------------------------
 -- boilerplate code
 ------------------------------------
 
 state = nil
+sleep=0
 
 -- destroys everything from current state
 function reset_state()
@@ -749,8 +751,11 @@ function _init()
 end
 
 function _update()
-  update_invoke()
-  state.update()
+  if sleep==0 then
+    --update_invoke()
+    state.update()
+  end
+  sleep=max(0,sleep-1)
 end
 
 function _draw()

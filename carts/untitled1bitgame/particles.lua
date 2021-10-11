@@ -55,14 +55,14 @@ ptext=particle:extend(
 function ptext:init()
   local vx=0
   if self.vh then vx=rnd(0.5)-0.5 end
-  self.vel=v(vx,-(rnd(1)+0.5))
+  self.vel=v(vx,-(rnd(0.8)+0.5))
 end
 
-function ptext:update()
-  if self.t > self.lifetime/3 then 
-    self.vel=v(0,0) 
-  end
-end
+-- function ptext:update()
+--   if self.t > self.lifetime/3 then 
+--     self.vel=v(0,0) 
+--   end
+-- end
 
 function ptext:render()
   local offs={
@@ -78,6 +78,6 @@ function ptext:render()
   if self.t > 2*self.lifetime/3 then
     draw_dithered(
       (self.lifetime-self.t)/(2*self.lifetime/3),false,
-      box(self.pos.x,self.pos.y,self.pos.x+4*#self.txt+2,self.pos.y+4))
+      box(self.pos.x,self.pos.y,self.pos.x+4*#self.txt,self.pos.y+4))
   end
 end
