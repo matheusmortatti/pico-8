@@ -35,11 +35,12 @@ function gamestate.init()
 
   
   load_level()
-  e_add(cam(
+  cm=cam(
     {
       pos=level_index*128
     }
-  ))
+  )
+  e_add(cm)
 
   e_add(fade({
     step=-1,ll=3

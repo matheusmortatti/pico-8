@@ -10,7 +10,7 @@ fireplace=entity:extend(
   {
     fr=2,ff=2,
     draw_order=2,
-    lr=16
+    lr=24
   }
 )
 
@@ -25,6 +25,7 @@ function fireplace:destroy()
 end
 
 function fireplace:update()
+  if (self.t%10==0)self.lr=rnd(9)+16
   add_explosion(self.pos,1,2,2,-3,-1,7,9,0)
 end
 
@@ -147,11 +148,6 @@ light_system=entity:extend({
 light_system:spawns_from(48)
 
 function light_system:update()
-  if current_level and not self.tpos then
-    self.tpos = current_level.base
-    self.ppos = current_level.pos
-  end
-
   for i=0,15 do
     for j=0,15 do
       local ll=1
@@ -159,8 +155,8 @@ function light_system:update()
         local r=e.lr
         if r then
           local dist = v(
-            abs(e.pos.x-(self.ppos.x+i*8)),
-            abs(e.pos.y-(self.ppos.y+j*8))
+            abs(e.pos.x-(cm.pos.x+i*8)),
+            abs(e.pos.y-(cm.pos.y+j*8))
           ):len()
 
           if dist < r then
@@ -170,7 +166,7 @@ function light_system:update()
           end
         end
       end
-      self.rects[i*16+j] = {self.ppos.x+i*8,self.ppos.y+j*8,ll}
+      self.rects[i*16+j] = {cm.pos.x+i*8,cm.pos.y+j*8,ll}
     end
   end
 end
@@ -351,7 +347,8 @@ button=entity:extend({
   hitbox=box(0,0,8,8),
   collides_with={"player","enemy"},
   tags={"button"},
-  draw_order=1
+  draw_order=1,
+  persistent=true
 })
 
 button:spawns_from(61)
