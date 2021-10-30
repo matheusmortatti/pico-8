@@ -279,6 +279,7 @@ function door:update()
 end
 
 function door:dead()
+  mset(self.map_pos.x,self.map_pos.y,0)
   if (self.t==60) self.done=true
   if self.t%10 then
     add_explosion(self.pos,2,10,10,-2,-2,nil,nil,1)
