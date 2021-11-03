@@ -11,7 +11,8 @@ boss=spawner:extend({
     cd=300,
     maxvel=4,
     basevel=4,
-    inv_t=48*30
+    fric=10,
+    inv_t=1*30
 })
 
 boss:spawns_from(1)
@@ -52,37 +53,103 @@ function boss:update()
 end
 
 function boss:spawn_level(lx,ly)
-    local tx,ty=lx*16+1,ly*16+2 
-
+    local tx,ty=lx*16+1,ly*16+2
+ 
+    self.enemy_spawn_pos={}
+ 
     for i=0,13 do
         for j=0,12 do
             local t=mget(tx+i,ty+j)
-            if t!=0 then
-                mset(level_index.x*16+1+i,level_index.y*16+2+j,t)
+            local sx,sy=level_index.x*16+1+i,level_index.y*16+2+j
+            if t==19 then
+                add(self.enemy_spawn_pos,{sx*8,sy*8})
+            elseif t==33 then
+                scene_player.pos=v(sx*8,sy*8)
+            else
+                mset(sx,sy,t)
             end
         end
     end
 end
 
+function boss:reset_level()
+    for i=0,13 do
+        for j=0,12 do
+            local sx,sy=level_index.x*16+1+i,level_index.y*16+2+j
+            mset(sx,sy,0)
+        end
+    end
+end
+
+function boss:spawn_enemies()
+    for p in all(self.enemy_spawn_pos) do
+        local x,y=p[1],p[2]
+        local mp=v(x/8, y/8)
+        local e=enemy_list[flr(rnd(#enemy_list)+1)]
+        
+        local e_inst=e({
+            pos=mp*8,
+            vel=zero_vector(),
+            map_pos=mp
+        })
+        e_add(e_inst)
+        add(self.spawn_list, e_inst)
+
+        add_explosion(e_inst.pos,2,2,2,-3,-1,7,9,0)
+
+        if (e==bat) e_inst.attack_dist=10000
+        if (e==laserdude)e.sprite=10
+    end
+end
+
+function boss:delete_enemies()
+    for e in all(self.spawn_list) do
+        e.done=true
+    end
+    self.spawn_list={}
+end
+
 function boss:fadeout()
-    if self.t==1 then
-        self.f = e_add(fade({
-            func=function()
-                local li=level_index+v(1,0)
-                self:spawn_level(li.x,li.y)
-                e_add(fade({
-                    step=-1,ll=3
-                }))
-            end
-        }))
+    local f = e_add(fade({spd=5}))
+    f.func=function()
+        scene_player.pause=true
+        invoke(function(f) 
+            scene_player.pause=false
+
+            local li=level_index+v(1,0)
+            self:spawn_level(li.x,li.y)
+
+            e_add(fade({
+                step=-1,ll=3,spd=5
+            }))
+
+            f.done=true
+        end,30,f)
+        return nil
+    end
+    self:become("wave_update")
+end
+
+------------------------------------
+-- wave state
+------------------------------------
+
+
+function boss:wave_update()
+    local has_killed_everyone=true
+    for e in all(self.spawn_list) do
+        if e.done!=true then 
+            has_killed_everyone=false
+        end
     end
 
-    print(self.f.done)
+    if has_killed_everyone and not self.waiting_spawn then
+        self.spawn_list={}
+        self.waiting_spawn=true
+        invoke(function() self.waiting_spawn=false self:spawn_enemies() end, 120)
+    end
 end
 
-function boss:idle()
-
-end
 
 function boss:cooldown()
     if (self.t>self.cd) self:become("spawn_obstacles")
@@ -109,22 +176,10 @@ end
 
 function boss:hit_reaction()
     self.invincible=true
-    -- self:spawn()
+    self:delete_enemies()
+    self:reset_level()
+    printh("here")
     self:become("choose_pos")
-    for e in all(self.obstacle_list) do
-        e.ent.done=true
-        del(self.obstacle_list,e)
-        for i=1,2 do
-            p_add(smoke(
-            {
-                pos=v(
-                    e.ent.pos.x+4+rnd(2)-1,
-                    e.ent.pos.y+2+rnd(2)-1),
-                c=rnd(1)<0.5 and 7 or 9
-            }
-            ))
-        end
-    end
 end
 
 function boss:spawn_obstacles()

@@ -3,15 +3,16 @@ fade=entity:extend({
     ll=0,
     func=nil,
     step=1,
-    draw_order=7
+    draw_order=7,
+    spd=15
 })
 
 function fade:update()
-    if self.t%15==14 then
+    if self.t%self.spd==self.spd-1 then
         self.ll+=self.step
-        if (self.ll==#self.pt or self.ll==-1) and self.func then
-            self.func()
-            self.done=true
+        if (self.ll==#self.pt or self.ll==-1) then
+            if (self.func) self.done=self.func() self.func=nil
+            if (self.done==false) self.done=true
         end
         self.ll=clamp(0,#self.pt-1,self.ll)
     end

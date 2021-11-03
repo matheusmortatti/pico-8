@@ -55,6 +55,7 @@ function load_main_options()
         e_add(fade({
             func=function()
                 load("u1bg.p8", nil, "72,22")
+                return true
             end
         }))
       end

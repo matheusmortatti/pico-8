@@ -55,6 +55,7 @@ function gamestate.update()
  do_movement()
  do_collisions()
  p_update()
+ update_invoke()
 
  local t_add=-(time()-pft)
  add_time(global_timer<10 and t_add*(global_timer*0.7/10+0.3) or t_add)
@@ -77,4 +78,23 @@ function gamestate.draw()
   rectfill(1, 1, #st*4+3, 9, 0)
   rect(1, 1, #st*4+3, 9, c)
   print(st, 3, 3, c)
+end
+
+------------------------------------
+-- func scheduler
+------------------------------------
+
+invoke_func = {}
+function invoke(func,t,p)
+  add(invoke_func,{func,0,t,p})
+end
+
+function update_invoke()
+  for i=#invoke_func,1,-1 do
+    invoke_func[i][2]+=1
+    if invoke_func[i][2]>=invoke_func[i][3] then
+      invoke_func[i][1](invoke_func[i][4])
+      del(invoke_func,invoke_func[i])
+    end
+  end
 end
