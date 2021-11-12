@@ -8,8 +8,6 @@ __lua__
 #include particles.lua
 #include player.lua
 #include enemy.lua
-#include spawner.lua
-#include cart_change.lua
 #include fade.lua
 #include slowdown.lua
 #include boss.lua
