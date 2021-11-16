@@ -14,7 +14,13 @@ boss=enemy:extend({
     maxvel=4,
     basevel=4,
     fric=10,
-    inv_t=1*30
+    inv_t=1*30,
+    difficulty_level=1,
+    wave_index=0,
+    wave_levels={
+        {v(5,0),v(6,0),v(7,0)},
+        {}
+    }
 })
 
 boss:spawns_from(1)
@@ -55,23 +61,33 @@ function boss:update()
     end
 end
 
-function boss:spawn_level(lx,ly)
+function spawn_level(lx,ly)
     local tx,ty=lx*16+1,ly*16+2
  
-    self.enemy_spawn_pos={}
- 
+    local enemy_spawn_pos={}
+    local tile_list={}
+    local player_pos=nil
     for i=0,13 do
         for j=0,12 do
             local t=mget(tx+i,ty+j)
             local sx,sy=level_index.x*16+1+i,level_index.y*16+2+j
             if t==19 then
-                add(self.enemy_spawn_pos,{sx*8,sy*8})
+                add(enemy_spawn_pos,{sx*8,sy*8})
             elseif t==33 then
-                scene_player.pos=v(sx*8,sy*8)
+                player_pos=v(sx*8,sy*8)
+            elseif t==128 then
+                boss_pos=v(sx*8,sy*8)
             else
-                mset(sx,sy,t)
+                add(tile_list, {sx,sy,t})
             end
         end
+    end
+    return tile_list,enemy_spawn_pos,player_pos,boss_pos
+end
+
+function draw_tiles(tile_list)
+    for ti in all(tile_list) do
+        mset(ti[1], ti[2], ti[3])
     end
 end
 
@@ -112,15 +128,62 @@ function boss:delete_enemies()
     self.spawn_list={}
 end
 
-function boss:fadeout()
+------------------------------------
+-- wave state
+------------------------------------
+
+function boss:waves()
+    self.wave_index=0
+    self:become("waves_move_init")
+end
+
+function boss:waves_update()
+    local has_killed_everyone=true
+    for e in all(self.spawn_list) do
+        if e.done!=true then 
+            has_killed_everyone=false
+        end
+    end
+
+    if self.t==120 then
+        self:spawn_enemies()
+    elseif self.t>120 and has_killed_everyone then
+        self:become("waves_move_init")
+    end
+end
+
+function boss:waves_move_init()
+    self:reset()
+
+    self.wave_index+=1
+    if self.wave_index>#self.wave_levels[self.difficulty_level] then
+        self:become("direct_attack_prepare_init") 
+        return
+    end
+    
+    local li=self.wave_levels[self.difficulty_level][self.wave_index]
+    self.tile_list,self.enemy_spawn_pos,self.player_pos, self.target_pos=spawn_level(li.x,li.y)
+    
+    self.co_move_to = cocreate(move_to)
+    self:become("waves_move_update")
+end
+
+function boss:waves_move_update()
+    coresume(self.co_move_to,self,self.target_pos)
+    if costatus(self.co_move_to) == 'dead' then
+        self:become("waves_fadeout")
+    end
+end
+
+function boss:waves_fadeout()
     local f = e_add(fade({spd=5}))
     f.func=function()
         scene_player.pause=true
         invoke(function(f) 
             scene_player.pause=false
 
-            local li=level_index+v(1,0)
-            self:spawn_level(li.x,li.y)
+            scene_player.pos=self.player_pos
+            draw_tiles(self.tile_list)
 
             e_add(fade({
                 step=-1,ll=3,spd=5
@@ -130,27 +193,7 @@ function boss:fadeout()
         end,30,f)
         return nil
     end
-    self:become("wave_update")
-end
-
-------------------------------------
--- wave state
-------------------------------------
-
-
-function boss:wave_update()
-    local has_killed_everyone=true
-    for e in all(self.spawn_list) do
-        if e.done!=true then 
-            has_killed_everyone=false
-        end
-    end
-
-    if has_killed_everyone and not self.waiting_spawn then
-        self.spawn_list={}
-        self.waiting_spawn=true
-        invoke(function() self.waiting_spawn=false self:spawn_enemies() end, 120)
-    end
+    self:become("waves_update")
 end
 
 ------------------------------------
@@ -171,21 +214,31 @@ function boss:direct_attack_prepare()
 end
 
 function boss:direct_attack_aim_init()
-    if (self.direct_attack_counter>=3) self:become("choose_pos") return
+    if (self.direct_attack_counter>=3) self:become("waves") return
 
     self.co_move_to = cocreate(move_to)
+    self.initial_pos=self.pos:copy()
     self:become("direct_attack_aim")
 end
 
 function boss:direct_attack_aim()
-    coresume(self.co_move_to,self,v(scene_player.pos.x,32))
+    coresume(self.co_move_to,self,v(scene_player.pos.x,32),15)
+    --coresume(self.co_move_to,self,self.initial_pos,v(scene_player.pos.x,32),0.2,300)
     if costatus(self.co_move_to) == 'dead' then
         self:become("direct_attack_shoot")
     end
 end
 
 function boss:direct_attack_shoot()
-    if (self.t%100==0) self.direct_attack_counter+=1 self:become("direct_attack_aim_init")
+    if self.t==1 and self.difficulty_level>0 then
+        self.maxvel=1
+        self.dir.x=sign(scene_player.pos.x-self.pos.x)
+    end
+    if self.t%30==0 then 
+        self.dir=zero_vector()
+        self.direct_attack_counter+=1 
+        self:become("direct_attack_aim_init")
+    end
 end
 
 function boss:render_direct_attack_shoot()
@@ -200,45 +253,15 @@ function boss:cooldown()
     if (self.t>self.cd) self:become(self.next_state)
 end
 
-function boss:choose_pos()
-    local positions={
-        v(4,4),v(4,11),v(11,4),v(11,11)
-    }
-    self.target_pos=positions[flr(rnd(#positions)+1)]*8+level_index*128
-    self:become("move_init")
-end
-
-function boss:move_init()
-    self.co_move_to = cocreate(move_to)
-    self:become("move_update")
-end
-
-function boss:move_update()
-    coresume(self.co_move_to,self,self.target_pos)
-    if costatus(self.co_move_to) == 'dead' then
-        self:become("fadeout")
-    end
-end
-
-function move_to(inst,target_pos)
-    printh(target_pos:str())
-    local s=0
-    while s>=0 do
-        local last_dir=inst.dir
-        inst.dir=(target_pos-inst.pos):norm()
-        s=inst.dir.x*last_dir.x+inst.dir.y*last_dir.y
-        yield()
-    end
-
-    inst.pos=target_pos
-    inst.dir=zero_vector()
-end
-
 function boss:hit_reaction()
     self.invincible=true
+    self:reset()
+    self:become("direct_attack_prepare_init")
+end
+
+function boss:reset()
     self:delete_enemies()
     self:reset_level()
-    self:become("direct_attack_prepare_init")
 end
 
 function boss:render()
@@ -249,4 +272,46 @@ function boss:render()
 
     local draw_state="render_"..self.state
     if (self[draw_state])self[draw_state](self)
+end
+
+------------------------------------
+-- helper functions
+------------------------------------
+
+function move_to(inst,target_pos,t)
+    t=t or 30
+    local s=0
+    local init_pos=inst.pos:copy()
+    local dir=(target_pos-init_pos):norm()
+    while s<=t do
+        local x0=init_pos.x-dir.x
+        local x1=init_pos.x
+        local x2=target_pos.x
+        local x3=init_pos.x+dir.x
+
+        inst.pos.x=cubic_lerp(x0,x1,x2,x3,s/t)
+
+        local y0=init_pos.y-dir.y
+        local y1=init_pos.y
+        local y2=target_pos.y
+        local y3=init_pos.y+dir.y
+
+        inst.pos.y=cubic_lerp(y0,y1,y2,y3,s/t)
+        s+=1
+
+        yield()
+    end
+
+    inst.pos=target_pos
+    inst.dir=zero_vector()
+end
+
+function cubic_lerp(y0,y1,y2,y3,mu)
+    local mu2=mu*mu
+    local a0=y3-y2-y0+y1
+    local a1=y0-y1-a0
+    local a2=y2-y0
+    local a3=y1
+
+   return(a0*mu*mu2+a1*mu2+a2*mu+a3);
 end
