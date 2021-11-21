@@ -192,7 +192,6 @@ spike=enemy:extend({
   hb=box(0,0,7,7),
   hitbox=nil,
   collides_with={"player"},
-  tags={},
   draw_order=1,
   state="low",
   take=5,

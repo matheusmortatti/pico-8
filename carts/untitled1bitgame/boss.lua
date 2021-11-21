@@ -9,17 +9,18 @@ boss=enemy:extend({
     inv_t=6*30,
     health=10,
     spawn_time=1,
-    obstacle_list={},
     cd=300,
     maxvel=4,
     basevel=4,
     fric=10,
     inv_t=1*30,
-    difficulty_level=1,
+    difficulty_level=0,
     wave_index=0,
     wave_levels={
-        {v(5,0),v(6,0),v(7,0)},
-        {}
+        {v(5,0)}--,v(6,0),v(7,0)
+    },
+    open_levels={
+        v(0,0)
     }
 })
 
@@ -36,59 +37,11 @@ function boss:update()
 
     self.hit=false
     if self.ht > self.inv_t then
-        self.invincible=false
+        --self.invincible=false
         self.ht=0
     end
 
     self:set_vel()
-    for e in all(self.obstacle_list) do
-        e.timer+=1
-        if(e.timer>e.deadline or (self.hit and self.t>self.ht)) then
-            e.ent.done=true
-            del(self.obstacle_list,e)
-
-            for i=1,2 do
-                p_add(smoke(
-                {
-                    pos=v(
-                        e.ent.pos.x+4+rnd(2)-1,
-                        e.ent.pos.y+2+rnd(2)-1),
-                    c=rnd(1)<0.5 and 7 or 9
-                }
-                ))
-            end
-        end
-    end
-end
-
-function spawn_level(lx,ly)
-    local tx,ty=lx*16+1,ly*16+2
- 
-    local enemy_spawn_pos={}
-    local tile_list={}
-    local player_pos=nil
-    for i=0,13 do
-        for j=0,12 do
-            local t=mget(tx+i,ty+j)
-            local sx,sy=level_index.x*16+1+i,level_index.y*16+2+j
-            if t==19 then
-                add(enemy_spawn_pos,{sx*8,sy*8})
-            elseif t==33 then
-                player_pos=v(sx*8,sy*8)
-            elseif t==128 then
-                boss_pos=v(sx*8,sy*8)
-            else
-                add(tile_list, {sx,sy,t})
-            end
-        end
-    end
-    return tile_list,enemy_spawn_pos,player_pos,boss_pos
-end
-
-function draw_tiles(tile_list)
-    for ti in all(tile_list) do
-        mset(ti[1], ti[2], ti[3])
-    end
 end
 
 function boss:reset_level()
@@ -102,7 +55,7 @@ end
 
 function boss:spawn_enemies()
     for p in all(self.enemy_spawn_pos) do
-        local x,y=p[1],p[2]
+        local x,y=p.x,p.y
         local mp=v(x/8, y/8)
         local e=enemy_list[flr(rnd(#enemy_list)+1)]
         
@@ -121,10 +74,14 @@ function boss:spawn_enemies()
     end
 end
 
-function boss:delete_enemies()
+function boss:delete_entities()
     for e in all(self.spawn_list) do
         e.done=true
     end
+    for e in all(self.entity_list) do
+        e.done=true
+    end
+    self.entity_list={}
     self.spawn_list={}
 end
 
@@ -155,9 +112,11 @@ end
 function boss:waves_move_init()
     self:reset()
 
+    if (self.difficulty_level>#self.wave_levels) self:become("direct_attack") return
+
     self.wave_index+=1
     if self.wave_index>#self.wave_levels[self.difficulty_level] then
-        self:become("direct_attack_prepare_init") 
+        self:become("open") 
         return
     end
     
@@ -171,36 +130,48 @@ end
 function boss:waves_move_update()
     coresume(self.co_move_to,self,self.target_pos)
     if costatus(self.co_move_to) == 'dead' then
-        self:become("waves_fadeout")
+        self:become("fadeout")
+        self.next_state="waves_update"
     end
 end
 
-function boss:waves_fadeout()
-    local f = e_add(fade({spd=5}))
-    f.func=function()
-        scene_player.pause=true
-        invoke(function(f) 
-            scene_player.pause=false
+------------------------------------
+-- open state
+------------------------------------
 
-            scene_player.pos=self.player_pos
-            draw_tiles(self.tile_list)
+function boss:open()
+    self:become("open_move_init")
+    self.invincible=false
+end
 
-            e_add(fade({
-                step=-1,ll=3,spd=5
-            }))
+function boss:open_move_init()
+    self:reset()
+    if (self.difficulty_level>#self.open_levels) self:become("direct_attack") return
 
-            f.done=true
-        end,30,f)
-        return nil
+    local li=self.open_levels[self.difficulty_level]
+    self.tile_list,self.enemy_spawn_pos,self.player_pos, self.target_pos=spawn_level(li.x,li.y)
+    
+    self.co_move_to = cocreate(move_to)
+    self:become("open_move_update")
+end
+
+function boss:open_move_update()
+    coresume(self.co_move_to,self,self.target_pos)
+    if costatus(self.co_move_to) == 'dead' then
+        self:become("fadeout")
+        self.next_state="open_update"
     end
-    self:become("waves_update")
+end
+
+function boss:open_update()
+    -- stay here until it gets attacked
 end
 
 ------------------------------------
 -- direct attack state
 ------------------------------------
 
-function boss:direct_attack_prepare_init()
+function boss:direct_attack()
     self.direct_attack_counter=0
     self.co_move_to = cocreate(move_to)
     self:become("direct_attack_prepare")
@@ -230,7 +201,7 @@ function boss:direct_attack_aim()
 end
 
 function boss:direct_attack_shoot()
-    if self.t==1 and self.difficulty_level>0 then
+    if self.t==1 and self.difficulty_level>=2 then
         self.maxvel=1
         self.dir.x=sign(scene_player.pos.x-self.pos.x)
     end
@@ -249,18 +220,40 @@ end
 -- END direct attack state
 ------------------------------------
 
+function boss:fadeout()
+    local f = e_add(fade({spd=5}))
+    f.func=function()
+        scene_player.pause=true
+        invoke(function(f) 
+            scene_player.pause=false
+
+            scene_player.pos=self.player_pos
+            self.entity_list=draw_tiles(self.tile_list)
+
+            e_add(fade({
+                step=-1,ll=3,spd=5
+            }))
+
+            f.done=true
+        end,30,f)
+        return nil
+    end
+    self:become(self.next_state)
+end
+
 function boss:cooldown()
     if (self.t>self.cd) self:become(self.next_state)
 end
 
 function boss:hit_reaction()
     self.invincible=true
+    self.difficulty_level+=1
     self:reset()
-    self:become("direct_attack_prepare_init")
+    self:become("direct_attack")
 end
 
 function boss:reset()
-    self:delete_enemies()
+    self:delete_entities()
     self:reset_level()
 end
 
@@ -277,6 +270,52 @@ end
 ------------------------------------
 -- helper functions
 ------------------------------------
+
+function spawn_level(lx,ly)
+    local tx,ty=lx*16+1,ly*16+2
+ 
+    local enemy_spawn_pos={}
+    local tile_list={}
+    local player_pos=nil
+    for i=0,13 do
+        for j=0,12 do
+            local t=mget(tx+i,ty+j)
+            local sx,sy=level_index.x*16+1+i,level_index.y*16+2+j
+            local p=v(sx*8,sy*8)
+            if t==19 then
+                add(enemy_spawn_pos,p)
+            elseif t==33 then
+                player_pos=p
+            elseif t==128 then
+                boss_pos=p
+            else
+                add(tile_list, {sx,sy,t})
+            end
+        end
+    end
+    return tile_list,enemy_spawn_pos,player_pos,boss_pos
+end
+
+function draw_tiles(tile_list)
+    local entity_list={}
+    for ti in all(tile_list) do
+        local mpos=v(ti[1], ti[2])
+        mset(mpos.x, mpos.y, ti[3])
+        local eclass=entity.spawns[ti[3]]
+        if eclass then
+            local e=eclass({
+                pos=mpos*8,
+                vel=zero_vector(),
+                sprite=ti[3],
+                map_pos=mpos
+            })
+            add(entity_list, e)
+            e_add(e)
+        end
+    end
+
+    return entity_list
+end
 
 function move_to(inst,target_pos,t)
     t=t or 30
