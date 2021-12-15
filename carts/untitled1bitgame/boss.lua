@@ -54,16 +54,19 @@ function boss:reset_level()
 end
 
 function boss:spawn_enemies()
-    for p in all(self.enemy_spawn_pos) do
+    for c in all(self.enemy_spawn_class) do
+        local e,p,t=c[1],c[2],c[3]
         local x,y=p.x,p.y
         local mp=v(x/8, y/8)
-        local e=enemy_list[flr(rnd(#enemy_list)+1)]
         
         local e_inst=e({
             pos=mp*8,
             vel=zero_vector(),
-            map_pos=mp
+            map_pos=mp,
+            sprite=t,
+            inst=e
         })
+
         e_add(e_inst)
         add(self.spawn_list, e_inst)
 
@@ -97,7 +100,7 @@ end
 function boss:waves_update()
     local has_killed_everyone=true
     for e in all(self.spawn_list) do
-        if e.done!=true then 
+        if e.inst!=spike and e.done!=true then 
             has_killed_everyone=false
         end
     end
@@ -112,7 +115,7 @@ end
 function boss:waves_move_init()
     self:reset()
 
-    if (self.difficulty_level>#self.wave_levels) self:become("direct_attack") return
+    if (self.difficulty_level>#self.wave_levels) self:become("open") return
 
     self.wave_index+=1
     if self.wave_index>#self.wave_levels[self.difficulty_level] then
@@ -121,7 +124,7 @@ function boss:waves_move_init()
     end
     
     local li=self.wave_levels[self.difficulty_level][self.wave_index]
-    self.tile_list,self.enemy_spawn_pos,self.player_pos, self.target_pos=spawn_level(li.x,li.y)
+    self.tile_list,self.enemy_spawn_class,self.player_pos, self.target_pos=spawn_level(li.x,li.y)
     
     self.co_move_to = cocreate(move_to)
     self:become("waves_move_update")
@@ -149,7 +152,7 @@ function boss:open_move_init()
     if (self.difficulty_level>#self.open_levels) self:become("direct_attack") return
 
     local li=self.open_levels[self.difficulty_level]
-    self.tile_list,self.enemy_spawn_pos,self.player_pos, self.target_pos=spawn_level(li.x,li.y)
+    self.tile_list,self.enemy_spawn_class,self.player_pos, self.target_pos=spawn_level(li.x,li.y)
     
     self.co_move_to = cocreate(move_to)
     self:become("open_move_update")
@@ -164,6 +167,7 @@ function boss:open_move_update()
 end
 
 function boss:open_update()
+    if self.t==1 then self:spawn_enemies() end
     -- stay here until it gets attacked
 end
 
@@ -172,21 +176,59 @@ end
 ------------------------------------
 
 function boss:direct_attack()
-    self.direct_attack_counter=0
+    self.direct_attack_counter=-1
     self.co_move_to = cocreate(move_to)
+    
+    self:reset()
+    
+    self.tile_list,self.enemy_spawn_class,self.player_pos, self.target_pos=spawn_level(4,1)
+    add(self.enemy_spawn_class,{spike,self.player_pos,116})
     self:become("direct_attack_prepare")
 end
 
 function boss:direct_attack_prepare()
-    coresume(self.co_move_to,self,level_index*128+v(64,32))
+    coresume(self.co_move_to,self,self.target_pos)
     if costatus(self.co_move_to) == 'dead' then
+        self:become("fadeout")
+        self.next_state="direct_attack_decide_attack"
+    end
+end
+
+function boss:direct_attack_decide_attack()
+    self.direct_attack_counter+=1
+    printh(self.direct_attack_counter)
+    if (self.direct_attack_counter>=3) self:become("waves") return
+
+    if #self.enemy_spawn_class>0 and rnd(1)>0.7 then
+        self:become("direct_attack_spawn_spikes")
+    else
         self:become("direct_attack_aim_init")
     end
 end
 
-function boss:direct_attack_aim_init()
-    if (self.direct_attack_counter>=3) self:become("waves") return
+function boss:direct_attack_spawn_spikes()
+    if self.t==1 then
+        self:spawn_enemies()
+        local n=4
+        for i=0,n do
+            local s=self.spawn_list[flr(rnd(#self.spawn_list)+1)]
+            s.done=true
+            del(self.spawn_list, s)
+        end
 
+        for e in all(self.spawn_list) do
+            e.low_t=0 e.mid_t=90 e.high_t=1000
+        end
+    end
+
+    if self.t>150 then
+        self:delete_entities()
+        self:become("direct_attack_decide_attack")
+    end
+end
+
+
+function boss:direct_attack_aim_init()
     self.co_move_to = cocreate(move_to)
     self.initial_pos=self.pos:copy()
     self:become("direct_attack_aim")
@@ -194,26 +236,23 @@ end
 
 function boss:direct_attack_aim()
     coresume(self.co_move_to,self,v(scene_player.pos.x,32),15)
-    --coresume(self.co_move_to,self,self.initial_pos,v(scene_player.pos.x,32),0.2,300)
     if costatus(self.co_move_to) == 'dead' then
         self:become("direct_attack_shoot")
+        self.laser=e_add(laser({pos=self.pos+v(0,8)}))
     end
 end
 
 function boss:direct_attack_shoot()
+    self.laser.pos=self.pos+v(0,8)
     if self.t==1 and self.difficulty_level>=2 then
         self.maxvel=1
         self.dir.x=sign(scene_player.pos.x-self.pos.x)
     end
     if self.t%30==0 then 
         self.dir=zero_vector()
-        self.direct_attack_counter+=1 
-        self:become("direct_attack_aim_init")
+        self.laser.done=true
+        self:become("direct_attack_decide_attack")
     end
-end
-
-function boss:render_direct_attack_shoot()
-    line(self.pos.x+4, self.pos.y+4,self.pos.x+4, self.pos.y+100)
 end
 
 ------------------------------------
@@ -238,7 +277,8 @@ function boss:fadeout()
         end,30,f)
         return nil
     end
-    self:become(self.next_state)
+    self.cd=60
+    self:become("cooldown")
 end
 
 function boss:cooldown()
@@ -267,6 +307,8 @@ function boss:render()
     if (self[draw_state])self[draw_state](self)
 end
 
+function boss:collide(e) end
+
 ------------------------------------
 -- helper functions
 ------------------------------------
@@ -274,7 +316,7 @@ end
 function spawn_level(lx,ly)
     local tx,ty=lx*16+1,ly*16+2
  
-    local enemy_spawn_pos={}
+    local enemy_spawn_class={}
     local tile_list={}
     local player_pos=nil
     for i=0,13 do
@@ -282,8 +324,9 @@ function spawn_level(lx,ly)
             local t=mget(tx+i,ty+j)
             local sx,sy=level_index.x*16+1+i,level_index.y*16+2+j
             local p=v(sx*8,sy*8)
-            if t==19 then
-                add(enemy_spawn_pos,p)
+            local eclass=entity.spawns[t]
+            if eclass then
+                add(enemy_spawn_class,{eclass,p,t})
             elseif t==33 then
                 player_pos=p
             elseif t==128 then
@@ -293,7 +336,7 @@ function spawn_level(lx,ly)
             end
         end
     end
-    return tile_list,enemy_spawn_pos,player_pos,boss_pos
+    return tile_list,enemy_spawn_class,player_pos,boss_pos
 end
 
 function draw_tiles(tile_list)
@@ -353,4 +396,36 @@ function cubic_lerp(y0,y1,y2,y3,mu)
     local a3=y1
 
    return(a0*mu*mu2+a1*mu2+a2*mu+a3);
+end
+
+laser=enemy:extend({
+    hitbox=box(0,0,8,200),
+    state="charging",
+    c_tile=false
+})
+
+function laser:init()
+    local f=function(s) self:become(s) end
+    invoke(f, 10, "shooting")
+    invoke(f, 20, "cooldown")
+end
+
+function laser:shooting()
+    local p=c_get_entity(scene_player)
+    if p.b:overlaps(self.hitbox:translate(self.pos))then
+        enemy_collide(self, scene_player)
+    end
+end
+
+function laser:render()
+    local x,y=self.pos.x,self.pos.y
+    if self.state=="charging" or self.state=="cooldown" then
+        if self.t%2 == 1 then
+            rectfill(x+3, y, x+4, y+200, 8)
+        end
+    elseif self.state=="shooting" then
+        rectfill(x+3, y, x+4, y+200, 8)
+        rectfill(x, y, x+2, y+200, 9)
+        rectfill(x+5, y, x+7, y+200, 9)
+    end
 end
