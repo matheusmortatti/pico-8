@@ -9,6 +9,7 @@ boss=enemy:extend({
     inv_t=6*30,
     health=10,
     spawn_time=1,
+    draw_order=2,
     cd=300,
     maxvel=4,
     basevel=4,
@@ -17,7 +18,9 @@ boss=enemy:extend({
     difficulty_level=0,
     wave_index=0,
     wave_levels={
-        {v(5,0)}--,v(6,0),v(7,0)
+        {v(7,0)},
+        {v(6,0), v(5,0)},
+        {v(7,1)}
     },
     open_levels={
         v(0,0)
@@ -105,7 +108,7 @@ function boss:waves_update()
         end
     end
 
-    if self.t==120 then
+    if self.t==30 then
         self:spawn_enemies()
     elseif self.t>120 and has_killed_everyone then
         self:become("waves_move_init")
@@ -115,6 +118,7 @@ end
 function boss:waves_move_init()
     self:reset()
 
+    printh(self.difficulty_level)
     if (self.difficulty_level>#self.wave_levels) self:become("open") return
 
     self.wave_index+=1
@@ -149,9 +153,8 @@ end
 
 function boss:open_move_init()
     self:reset()
-    if (self.difficulty_level>#self.open_levels) self:become("direct_attack") return
 
-    local li=self.open_levels[self.difficulty_level]
+    local li=self.open_levels[min(self.difficulty_level,#self.open_levels)]
     self.tile_list,self.enemy_spawn_class,self.player_pos, self.target_pos=spawn_level(li.x,li.y)
     
     self.co_move_to = cocreate(move_to)
@@ -196,7 +199,7 @@ end
 
 function boss:direct_attack_decide_attack()
     self.direct_attack_counter+=1
-    printh(self.direct_attack_counter)
+
     if (self.direct_attack_counter>=3) self:become("waves") return
 
     if #self.enemy_spawn_class>0 and rnd(1)>0.7 then
@@ -259,6 +262,26 @@ end
 -- END direct attack state
 ------------------------------------
 
+function boss:dying()
+    if self.t%10==0 then
+        for i=1,3 do
+            e_add(smoke({
+                pos=v(self.pos.x+rnd(8), self.pos.y+rnd(8)),
+                c=7,r=rnd(2)+3,v=0.3
+            }))
+            shake=2
+        end
+    end
+
+    if self.t==90 then
+        local f = e_add(fade({spd=10, c=7}))
+        f.func=function()
+            load("credits.p8")
+            return nil
+        end
+    end
+end
+
 function boss:fadeout()
     local f = e_add(fade({spd=5}))
     f.func=function()
@@ -290,6 +313,7 @@ function boss:hit_reaction()
     self.difficulty_level+=1
     self:reset()
     self:become("direct_attack")
+    if (self.difficulty_level>0) self:become("dying")
 end
 
 function boss:reset()

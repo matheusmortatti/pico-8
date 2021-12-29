@@ -202,7 +202,10 @@ spike=enemy:extend({
 
 spike:spawns_from(116,115)
 
+function spike:update() self.vel=zero_vector() end
+
 function spike:init()
+  self.invincible=true
   if (self.sprite==115) self.high_t*=2 self.type=1 self:become("waiting")
 end
 

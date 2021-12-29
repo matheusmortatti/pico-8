@@ -4,7 +4,7 @@ fade=entity:extend({
     func=nil,
     step=1,
     draw_order=7,
-    spd=15
+    spd=15,c=0
 })
 
 function fade:update()
@@ -21,6 +21,6 @@ end
 function fade:render()
     fillp(self.pt[self.ll])
     local p=level_index*128
-    rectfill(p.x,p.y,p.x+128,p.y+128,0)
+    rectfill(p.x,p.y,p.x+128,p.y+128,self.c)
     fillp()
 end
