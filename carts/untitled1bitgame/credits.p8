@@ -31,12 +31,9 @@ messages=entity:extend({
     index=1
 })
 
-function messages:init()
-end
-
 function messages:update()
   self.lines[self.index][3]+=1
-  if self.lines[self.index][3]>self.lines[self.index][2] then
+  if btnp(4) or btnp(5) or self.lines[self.index][3]>self.lines[self.index][2] then
     self.index+=1
     if self.index>#self.lines then
       e_add(fade({
@@ -44,18 +41,84 @@ function messages:update()
       }))
 
       self.done=true
+      e_add(credits({}))
     end
   end
 end
 
 function messages:render()
-  local nlines=#self.lines[self.index][1]
-  local starty=64-nlines*2
-  for line in all(self.lines[self.index][1]) do
+  render_text_middle(self.lines[self.index][1])
+end
+
+function render_text_middle(lines,offset)
+  local nlines=#lines
+  local off=offset or 0
+  local starty=64-nlines*2+off
+  for line in all(lines) do
     print(line, 64-#line*2,starty,0)
     starty+=6
   end
-  --print(self.lines[self.index][1],64-self.line_size*2,64,0)
+end
+
+credits=entity:extend({
+  text={
+    "a game by:", "",
+    "matheus mortatti",
+    "", "", "", "", "", "", "", "", "", "",
+
+    "game programming:",
+    "",
+    "matheus mortatti",
+    "","",
+
+    "art:",
+    "",
+    "matheus mortatti",
+    "","",
+
+    "level design:",
+    "",
+    "matheus mortatti",
+    "", "",
+
+    "playtesting:",
+    "",
+    "esdras chaves"
+  },
+  scroll=0
+})
+
+function credits:render()
+  local nlines=#self.text
+  local spd=(btn(4) or btn(5)) and 1 or 5
+  if self.t>120 and self.t%spd==0 then self.scroll+=1 end
+  render_text_middle(self.text,nlines*2-6-self.scroll)
+
+  if self.scroll>64+nlines*6 then
+    e_add(the_end({}))
+    self.done=true
+  end
+end
+
+the_end=entity:extend({})
+
+function the_end:init()
+  e_add(fade({
+        step=-1,ll=3,c=7
+      }))
+end
+
+function the_end:render()
+  render_text_middle({"the end."})
+
+  if self.t>90 and self.t%60>30 then
+    print("❎",62,96,0)
+  end
+
+  if self.t>90 and (btnp(5) or btnp(4)) then
+    self.done=true
+    load("titlescreen.p8")
+  end
 end
 
 ------------------------------------
