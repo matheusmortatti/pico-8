@@ -19,11 +19,13 @@ boss=enemy:extend({
     wave_index=0,
     wave_levels={
         {v(7,0)},
-        {v(6,0), v(5,0)},
-        {v(7,1)}
+        {v(6,1),v(7,1)},
+        {v(6,0), v(5,0),v(5,1)}
     },
     open_levels={
-        v(0,0)
+        v(0,0),
+        v(1,0),
+        v(2,0)
     }
 })
 
@@ -103,7 +105,7 @@ end
 function boss:waves_update()
     local has_killed_everyone=true
     for e in all(self.spawn_list) do
-        if e.inst!=spike and e.done!=true then 
+        if e.inst!=spike and e.inst!=slowdown and e.done!=true then 
             has_killed_everyone=false
         end
     end
@@ -118,7 +120,6 @@ end
 function boss:waves_move_init()
     self:reset()
 
-    printh(self.difficulty_level)
     if (self.difficulty_level>#self.wave_levels) self:become("open") return
 
     self.wave_index+=1
@@ -313,7 +314,7 @@ function boss:hit_reaction()
     self.difficulty_level+=1
     self:reset()
     self:become("direct_attack")
-    if (self.difficulty_level>0) self:become("dying")
+    if (self.difficulty_level>3) self:become("dying")
 end
 
 function boss:reset()
