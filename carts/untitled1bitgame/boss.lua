@@ -37,14 +37,8 @@ end
 
 function boss:update()
     self.player_boss_dir=(scene_player.pos-self.pos):norm()
-    -- invincibility time
-    if (self.invincible) self.ht+=1
 
-    self.hit=false
-    if self.ht > self.inv_t then
-        --self.invincible=false
-        self.ht=0
-    end
+    self:enemy_update()
 
     self:set_vel()
 end
