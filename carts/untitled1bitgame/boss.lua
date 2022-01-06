@@ -32,7 +32,7 @@ boss=enemy:extend({
 boss:spawns_from(1)
 
 function boss:init()
-    
+    self.sprite=132
 end
 
 function boss:update()
@@ -317,7 +317,8 @@ function boss:reset()
 end
 
 function boss:render()
-    shared_render(self)
+    --shared_render(self)
+    spr(self.sprite, self.pos.x, self.pos.y, 2, 2)
     if self.invincible then
         circ(self.pos.x+4,self.pos.y+4,10,9)
     end

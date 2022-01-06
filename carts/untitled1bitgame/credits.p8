@@ -10,21 +10,19 @@ messages=entity:extend({
     lines=
       {
         {
-          {"the balance of time","has been restored"},
+          {"the flow of time","has been restored"},
           120,0
         },
         {
           {"the gate has been sealed",
            "once again to keep",
-           "time contained within it."},
-          120,0	
+           "the sands of time",
+           "from getting into the",
+           "wrong hands."},
+          180,0	
         },
         {
           {"you come back home, place","your sword down and rest."},
-          120,0
-        },
-        {
-          {"the end"},
           120,0
         }
       },
