@@ -346,6 +346,7 @@ function spawn_level(lx,ly)
             local p=v(sx*8,sy*8)
             local eclass=entity.spawns[t]
             if eclass then
+                printh(t)
                 add(enemy_spawn_class,{eclass,p,t})
             elseif t==33 then
                 player_pos=p
