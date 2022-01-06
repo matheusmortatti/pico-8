@@ -16,6 +16,7 @@ boss=enemy:extend({
     fric=10,
     inv_t=1*30,
     difficulty_level=0,
+    direct_attack_repeat={3,4,6},
     wave_index=0,
     wave_levels={
         {v(7,0)},
@@ -180,7 +181,7 @@ function boss:direct_attack()
     self:reset()
     
     self.tile_list,self.enemy_spawn_class,self.player_pos, self.target_pos=spawn_level(4,1)
-    add(self.enemy_spawn_class,{spike,self.player_pos,116})
+    add(self.enemy_spawn_class,{spike,self.player_pos:copy(),116})
     self:become("direct_attack_prepare")
 end
 
@@ -195,19 +196,25 @@ end
 function boss:direct_attack_decide_attack()
     self.direct_attack_counter+=1
 
-    if (self.direct_attack_counter>=3) self:become("waves") return
-
-    if #self.enemy_spawn_class>0 and rnd(1)>0.7 then
-        self:become("direct_attack_spawn_spikes")
-    else
-        self:become("direct_attack_aim_init")
+    if self.direct_attack_counter>=self.direct_attack_repeat[self.difficulty_level] then
+        self:become("waves") return
     end
+
+    if self.direct_attack_counter%2==0 then
+        if #self.enemy_spawn_class>0 and rnd(1)>0.7 then
+            self.attack_state="direct_attack_spawn_spikes"
+        else
+            self.attack_state="direct_attack_aim_init"
+        end
+    end
+
+    self:become(self.attack_state)
 end
 
 function boss:direct_attack_spawn_spikes()
     if self.t==1 then
         self:spawn_enemies()
-        local n=4
+        local n=self.difficulty_level>1 and 2 or 4
         for i=0,n do
             local s=self.spawn_list[flr(rnd(#self.spawn_list)+1)]
             s.done=true
@@ -243,7 +250,7 @@ end
 function boss:direct_attack_shoot()
     self.laser.pos=self.pos+v(0,8)
     if self.t==1 and self.difficulty_level>=2 then
-        self.maxvel=1
+        self.maxvel=0.8
         self.dir.x=sign(scene_player.pos.x-self.pos.x)
     end
     if self.t%30==0 then 
