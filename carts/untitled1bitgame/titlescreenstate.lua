@@ -136,7 +136,7 @@ function load_ng_options()
 end
 
 function reset_cartdata()
-  dset(0,1)
+  dset(0,3)
   for i=1,63 do
     dset(i,0)
   end

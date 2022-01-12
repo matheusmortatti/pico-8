@@ -3,6 +3,9 @@
 ------------------------------------
 
 gamestate = {}
+safe_levels = {
+  v(3,0),v(4,0),v(5,0)
+}
 
 if not cartdata("u1bg") then
   dset(0,1)
@@ -13,22 +16,30 @@ function gamestate.init()
   multiplier=dget(10)
 
   local str_pos=split(stat(6))
-  if #str_pos>=2 then
-    local player_pos=v(str_pos[1],str_pos[2])
-    level_index=v(flr(player_pos.x/16),flr(player_pos.y/16))
+  -- if #str_pos>=2 then
+  --   local player_pos=v(str_pos[1],str_pos[2])
+  --   level_index=v(flr(player_pos.x/16),flr(player_pos.y/16))
 
-    scene_player=player({
-      pos=player_pos*8,
-      map_pos=player_pos,
-    })
+  --   scene_player=player({
+  --     pos=player_pos*8,
+  --     map_pos=player_pos,
+  --   })
 
-    e_add(scene_player)
-  else
-    for i=0,127 do
-      for j=0,63 do
-        if mget(i,j)==32 then
-          level_index=v(flr(i/16),flr(j/16))
-        end
+  --   e_add(scene_player)
+  -- else
+  --   for i=0,127 do
+  --     for j=0,63 do
+  --       if mget(i,j)==32 then
+  --         level_index=v(flr(i/16),flr(j/16))
+  --       end
+  --     end
+  --   end
+  -- end
+
+  for i=0,127 do
+    for j=0,63 do
+      if mget(i,j)==32 then
+        level_index=v(flr(i/16),flr(j/16))
       end
     end
   end
@@ -56,12 +67,18 @@ function gamestate.update()
  do_movement()
  do_collisions()
  p_update()
-
- local t_add=-(time()-pft)
- add_time(global_timer<10 and t_add*(global_timer*0.7/10+0.3) or t_add)
- global_timer=max(0, global_timer)
- global_timer=min(100,global_timer)
- pft=time()
+ 
+ local is_safe=false
+ for s in all(safe_levels) do
+  if (s == level_index) is_safe=true
+ end
+ if is_safe==false then
+  local t_add=-(time()-pft)
+  add_time(global_timer<10 and t_add*(global_timer*0.7/10+0.3) or t_add)
+  global_timer=max(0, global_timer)
+  global_timer=min(100,global_timer)
+end
+pft=time()
 end
 
 function gamestate.draw()

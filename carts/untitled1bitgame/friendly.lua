@@ -219,7 +219,8 @@ key=dynamic:extend({
 function key:init()
   self:become("idle")
   self.si=flr(self.pos.x/128)+8*flr(self.pos.y/128)
-  if band(dget(1),shl(1,self.si))!=0 then
+  printh(dget(1))
+  if band(dget(1),shl(0b0.0000000000000001,self.si))!=0 then
     self.done=true
   end
 end
@@ -241,7 +242,8 @@ function key:collide(e)
   if (self.state=="idle") self.p=e self:become("follow")
   if e:is_a("gate") then
    self.done=true
-   dset(1, bor(dget(1),shl(1,self.si)))
+   dset(1, bor(dget(1),shl(0b0.0000000000000001,self.si)))
+   printh(dget(1))
    add_explosion(self.pos,2,8,8)
   elseif e:is_a("key") then
     return c_push_out
