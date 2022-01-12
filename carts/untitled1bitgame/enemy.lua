@@ -54,7 +54,6 @@ function enemy:dead()
   if self.t > self.death_time then
     --mset(self.map_pos.x,self.map_pos.y,0)
     self.done=true
-    entity_map[tostr(self.map_pos.x) .. "," .. tostr(self.map_pos.y)]={time()}
   end
 end
 
@@ -79,6 +78,7 @@ function enemy:damage(s)
     self.ht=0
 
     if (self.hit_reaction) self:hit_reaction()
+    entity_map[tostr(self.map_pos.x) .. "," .. tostr(self.map_pos.y)]={time()}
   end 
 end
 
