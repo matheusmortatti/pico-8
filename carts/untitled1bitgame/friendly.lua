@@ -25,7 +25,7 @@ function fireplace:destroy()
 end
 
 function fireplace:update()
-  if (self.t%10==0)self.lr=rnd(9)+16
+  --if (self.t%10==0)self.lr=rnd(9)+16
   add_explosion(self.pos,1,2,2,-3,-1,7,9,0)
 end
 
@@ -95,7 +95,7 @@ end
 
 old_man=dynamic:extend({
  collides_with={"player"},
- tags={"old_man"}, dir=v(1,0),
+ dir=v(1,0),
  hitbox=box(-8,-8,16,16),
  draw_order=3,
  ssize=3,
@@ -117,9 +117,11 @@ end
 function old_man:end_collision()
     self.dialog:stop()
     self.p_near=false
+    btn_x_in_use=false
 end
 
 function old_man:collide(e)
+    btn_x_in_use=true
     if (btnp(5))self.dialog:next()
     self.p_near=true
 end
@@ -186,7 +188,6 @@ end
 -------------------------------
 
 pedestal=entity:extend({
-  tags={"pedestal"},
   draw_order=1,
   persistent=true
 })
@@ -206,7 +207,6 @@ end
 key=dynamic:extend({
  collides_with={"player", "gate","key"},
  tags={"key"}, dir=v(1,0),
- hitbox=box(0,0,8,8),
  draw_order=2,
  amp=5,
  scl=0.01,
@@ -345,7 +345,6 @@ end
 -------------------------------
 
 button=entity:extend({
-  hitbox=box(0,0,8,8),
   collides_with={"player","enemy"},
   tags={"button"},
   draw_order=1,
@@ -396,8 +395,8 @@ end
 
 upgrade=entity:extend({
   collides_with={"player"},
-  hitbox=box(0,0,8,8),
-  persistent=true
+  persistent=true,
+  dir=v(0,0)
 })
 
 upgrade:spawns_from(51)
@@ -423,4 +422,34 @@ function upgrade:collide(e)
   e:upgrade_movement()
   add_explosion(self.pos,10,8,0,0,-8,9,7,5)
   self.done=true
+end
+
+function upgrade:render()
+  shared_render(self)
+end
+
+-------------------------------
+-- entity: worldmap
+-------------------------------
+
+worldmap=entity:extend({
+  persistent=true,draw_order=7
+})
+
+function worldmap:render()
+  if (btn_x_in_use or btn(5)==false) return
+  local p=level_index*128
+  local s=8
+  local x1,y1=p.x+63-4*s,p.y+63-2*s
+  rectfill(x1,y1,x1+s*8,y1+s*4,0)
+
+  for i=0,4 do
+    line(x1,y1+i*s,x1+s*8,y1+i*s,7)
+  end
+  for i=0,8 do
+    line(x1+i*s,y1,x1+i*s,y1+s*4,7)
+  end
+  
+  local cp=level_index*s
+  if (self.t%30>15)rectfill(x1+cp.x,y1+cp.y,x1+cp.x+s,y1+cp.y+s,7)
 end

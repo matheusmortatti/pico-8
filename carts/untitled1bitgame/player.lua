@@ -160,7 +160,6 @@ player=dynamic:extend({
    sword_attack=entity:extend(
    {
     lifetime=10,
-    hitbox=box(0,0,8,8),
     tags={"attack"},
     collides_with={"enemy"},
     facing=v(1,0),
@@ -175,8 +174,6 @@ player=dynamic:extend({
    
     if self.facing.x ~= 0 then self.sprite=3 else self.sprite=4 end
     if self.t > self.lifetime then self.done=true end
-   
-    --if self.t>5 then self.hitbox=box(0,0,0,0) end
    end
    
    function sword_attack:render()  

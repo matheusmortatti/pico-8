@@ -9,7 +9,6 @@
 enemy=dynamic:extend({
   collides_with={"player"},
   tags={"enemy"},
-  hitbox=box(0,0,8,8),
   c_tile=true,  
   inv_t=30,
   ht=0,
@@ -52,7 +51,6 @@ end
 
 function enemy:dead()
   if self.t > self.death_time then
-    --mset(self.map_pos.x,self.map_pos.y,0)
     self.done=true
   end
 end
@@ -416,17 +414,13 @@ function laserdude:shooting()
   end
   if self.t > 30 then
     self:become("wondering")
+    self.dir=v(rnd(2)-1,rnd(2)-1)*0.5
   end
 end
 
 function laserdude:wondering()
-  local wonder_time=60
-  if self.t > wonder_time and not self.hit then
+  if self.t > 60 and not self.hit then
     self:become("shooting")
-  end
-
-  if self.t == 1 then
-    self.dir=v(rnd(2)-1,rnd(2)-1)*0.5
   end
 
   self:set_vel()
@@ -438,7 +432,6 @@ end
 
 bullet=enemy:extend({
   collides_with={"player"},
-  tags={"bullet"},
   hitbox=box(-1,-1,1,1),
   maxvel=2,
   take=5,
@@ -449,12 +442,6 @@ bullet=enemy:extend({
 
 function bullet:update()
   self:set_vel()
-  -- if self.t%5==0 then
-  --   local s=create_smoke(self.pos,2,2,1,1,7,9)
-    
-  --   s.vel=v(rnd(1)-0.5,rnd(1)-0.5)
-  --   p_add(s)
-  -- end
 
   if (self.t > self.lifetime) self.done=true
 end

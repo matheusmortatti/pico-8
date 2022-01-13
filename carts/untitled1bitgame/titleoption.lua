@@ -3,7 +3,6 @@
 ------------------------------------
 
 titleoption=dynamic:extend({
-    hitbox=box(0,0,8,8),
     collides_with = {"player"},
     tags={"titleoption"},
     c_tile=false,

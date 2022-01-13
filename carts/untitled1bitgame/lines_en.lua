@@ -28,6 +28,6 @@ lines={
         'someone is yet to\nfind the keys\nthat open this gate',
         'and discover the\nsecrets of time',
         'please, be\ncareful ...',
-        'and remember to use\nyour sword with ❎'
+        'and remember to use\nyour sword with z\nand check your map\nwith ❎'
     }
 }

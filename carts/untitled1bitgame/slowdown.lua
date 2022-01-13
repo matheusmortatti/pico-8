@@ -3,7 +3,6 @@
 -------------------------------
 
 slowdown=entity:extend({
-    hitbox=box(0,0,8,8),
     tags={"slowdown"},
     collides_with={"player","enemy"},
     draw_order=1

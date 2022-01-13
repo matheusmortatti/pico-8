@@ -1,6 +1,5 @@
 cart_change=entity:extend({
     collides_with={"player"},
-    hitbox=box(0,0,8,8),
     ll=0,
     ppos=v(71,14),
     cart={[127]="boss.p8",[125]="u1bg.p8"}

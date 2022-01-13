@@ -91,13 +91,79 @@ function v(x,y)
  },vector)
 end
 
+------------------------------------
+-- collision boxes
+------------------------------------
 
+-- collision boxes are just
+-- axis-aligned rectangles
+cbox=object:extend()
+ -- moves the box by the
+ -- vector v and returns
+ -- the result
+ function cbox:translate(v)
+  return cbox({
+   xl=self.xl+v.x,
+   yt=self.yt+v.y,
+   xr=self.xr+v.x,
+   yb=self.yb+v.y
+  })
+ end
+
+ -- checks if two boxes
+ -- overlap
+ function cbox:overlaps(b)
+  return
+   self.xr>b.xl and
+   b.xr>self.xl and
+   self.yb>b.yt and
+   b.yb>self.yt
+ end
+
+ -- calculates a vector that
+ -- neatly separates this box
+ -- from another. optionally
+ -- takes a table of allowed
+ -- directions
+function cbox:sepv(b,allowed)
+  local candidates={
+    v(b.xl-self.xr,0),
+    v(b.xr-self.xl,0),
+    v(0,b.yt-self.yb),
+    v(0,b.yb-self.yt)
+  }
+  if type(allowed)~="table" then
+   allowed={true,true,true,true}
+  end
+  local ml,mv=32767
+  for d,v in pairs(candidates) do
+   if allowed[d] and #v<ml then
+    ml,mv=#v,v
+   end
+  end
+
+  return mv
+end
+ 
+ -- printable representation
+ function cbox:str()
+  return self.xl..","..self.yt..":"..self.xr..","..self.yb
+ end
+
+-- makes a new box
+function box(xl,yt,xr,yb) 
+ return cbox({
+  xl=min(xl,xr),xr=max(xl,xr),
+  yt=min(yt,yb),yb=max(yt,yb)
+ })
+end
 
 entity=object:extend(
   {
     t=0,
     persistent=false,
-    spawns={}
+    spawns={},
+    hitbox=box(0,0,8,8)
   }
 )
 
@@ -194,73 +260,6 @@ function dynamic:set_vel()
     y=approach(self.vel.y,self.dir.y*self.maxvel,self.acc)
   end
   self.vel=v(x,y)
-end
-
-------------------------------------
--- collision boxes
-------------------------------------
-
--- collision boxes are just
--- axis-aligned rectangles
-cbox=object:extend()
- -- moves the box by the
- -- vector v and returns
- -- the result
- function cbox:translate(v)
-  return cbox({
-   xl=self.xl+v.x,
-   yt=self.yt+v.y,
-   xr=self.xr+v.x,
-   yb=self.yb+v.y
-  })
- end
-
- -- checks if two boxes
- -- overlap
- function cbox:overlaps(b)
-  return
-   self.xr>b.xl and
-   b.xr>self.xl and
-   self.yb>b.yt and
-   b.yb>self.yt
- end
-
- -- calculates a vector that
- -- neatly separates this box
- -- from another. optionally
- -- takes a table of allowed
- -- directions
-function cbox:sepv(b,allowed)
-  local candidates={
-    v(b.xl-self.xr,0),
-    v(b.xr-self.xl,0),
-    v(0,b.yt-self.yb),
-    v(0,b.yb-self.yt)
-  }
-  if type(allowed)~="table" then
-   allowed={true,true,true,true}
-  end
-  local ml,mv=32767
-  for d,v in pairs(candidates) do
-   if allowed[d] and #v<ml then
-    ml,mv=#v,v
-   end
-  end
-
-  return mv
-end
- 
- -- printable representation
- function cbox:str()
-  return self.xl..","..self.yt..":"..self.xr..","..self.yb
- end
-
--- makes a new box
-function box(xl,yt,xr,yb) 
- return cbox({
-  xl=min(xl,xr),xr=max(xl,xr),
-  yt=min(yt,yb),yb=max(yt,yb)
- })
 end
 
 

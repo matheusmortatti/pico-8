@@ -6,6 +6,7 @@ gamestate = {}
 safe_levels = {
   v(3,0),v(4,0),v(5,0)
 }
+btn_x_in_use=false
 
 if not cartdata("u1bg") then
   dset(0,1)
@@ -15,7 +16,6 @@ function gamestate.init()
 
   multiplier=dget(10)
 
-  local str_pos=split(stat(6))
   for i=0,127 do
     for j=0,63 do
       if mget(i,j)==32 then
@@ -32,8 +32,7 @@ function gamestate.init()
     }
   )
   e_add(cm)
-  wm=worldmap({})
-  e_add(wm)
+  wm=e_add(worldmap({}))
 
   e_add(fade({
     step=-1,ll=3

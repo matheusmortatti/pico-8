@@ -31,7 +31,7 @@ function add_explosion(pos,n,rnx,rny,offx,offy,c1,c2,shk)
   for i=1,n do
     e_add(create_smoke(pos,rnx,rny,offx or 0,offy or 0,c1 or 6,c2 or 7))
   end
-  shake=shk or 3
+  shake+=shk or 0
 end
 
 function create_smoke(pos,rnx,rny,offx,offy,c1,c2)
