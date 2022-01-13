@@ -219,7 +219,6 @@ key=dynamic:extend({
 function key:init()
   self:become("idle")
   self.si=flr(self.pos.x/128)+8*flr(self.pos.y/128)
-  printh(dget(1))
   if band(dget(1),shl(0b0.0000000000000001,self.si))!=0 then
     self.done=true
   end
@@ -243,7 +242,6 @@ function key:collide(e)
   if e:is_a("gate") then
    self.done=true
    dset(1, bor(dget(1),shl(0b0.0000000000000001,self.si)))
-   printh(dget(1))
    add_explosion(self.pos,2,8,8)
   elseif e:is_a("key") then
     return c_push_out
@@ -399,36 +397,30 @@ end
 upgrade=entity:extend({
   collides_with={"player"},
   hitbox=box(0,0,8,8),
-  type="sword"
+  persistent=true
 })
 
-upgrade:spawns_from(4,51)
+upgrade:spawns_from(51)
 
 function upgrade:init()
-  if (self.sprite==51) self.type="movement" self.ssize=2 self.svel=0.05
+  self.ssize=2 self.svel=0.05
+  if (dget(3)==1) self.done=true
   self.pos+=v(4,4)
 end
 
 function upgrade:update()
   self.pos += v(0, 0.5*sin(self.t/40+0.5))
-  if self.t%3==0 and self.type=="sword" then
+  if self.t%3==0 then
     p_add(smoke({
           pos=v(self.pos.x+rnd(8),self.pos.y+8),
-          c=12,r=1+rnd(1),v=0.15
+          c=9,r=1+rnd(1),v=0.15
         }))
   end
 end
 
 function upgrade:collide(e)
-  local c=12
-  if self.type=="sword" then
-    dset(2,1)
-    e.sword_upgrade=true
-  else
-    dset(3,1)
-    e:upgrade_movement()
-    c=9
-  end
-  add_explosion(self.pos,10,8,0,0,-8,c,7,5)
+  dset(3,1)
+  e:upgrade_movement()
+  add_explosion(self.pos,10,8,0,0,-8,9,7,5)
   self.done=true
 end

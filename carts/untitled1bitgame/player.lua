@@ -15,7 +15,6 @@ player=dynamic:extend({
     hit=false,
     dmg=1,
     has_swrd=false,
-    sword_upgrade=false,
     basevel=1,
     lr=32,
     persistent=true
@@ -25,7 +24,6 @@ player=dynamic:extend({
    
    function player:init()
     self.last_dir=v(1,0)
-    self.sword_upgrade=dget(2)==1 and true or false
     if (dget(3)==1) self:upgrade_movement()
     add(lightpoints, self)
    end
@@ -93,8 +91,7 @@ player=dynamic:extend({
      self.attk=sword_attack(
        {
          pos=self.pos+dir*8,
-         facing=dir,
-         upg=self.sword_upgrade
+         facing=dir
        }
      )
      self.attk.dmg=self.dmg
@@ -138,7 +135,6 @@ player=dynamic:extend({
    end
    
    function player:damage(dmg)
-    dmg=self.sword_upgrade and dmg*1.2 or dmg
     if not self.hit then
       sleep=5
      p_add(ptext({
@@ -173,12 +169,6 @@ player=dynamic:extend({
     draw_order=5
    })
    
-   function sword_attack:init()
-    if self.upg then
-      add_explosion(self.pos,4,8,8,0,0,12,7,0)
-    end
-   end
-   
    function sword_attack:update()
     self.flipx=self.facing.x==-1
     self.flipy=self.facing.y==1
@@ -203,8 +193,7 @@ player=dynamic:extend({
    
    function sword_attack:collide(e)
     if e:is_a("enemy") and not e.hit then
-     local multiplier=self.upg and 1.3 or 1
-     e:damage(self.dmg*multiplier)
+     e:damage(self.dmg)
      local allowed_dirs={
       v(-1,0)==self.facing,
       v(1,0)==self.facing,

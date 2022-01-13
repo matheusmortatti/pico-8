@@ -18,7 +18,7 @@ function reset_pal()
 end
 
 function add_time(t)
-	global_timer += t
+	global_timer = global_timer + t
 end
 
 function c_push_vel(oc,ec,args)

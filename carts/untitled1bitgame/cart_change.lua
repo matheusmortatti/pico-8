@@ -17,3 +17,5 @@ function cart_change:collide(e)
     scene_player.pause=true
     self.done=true
 end
+
+function cart_change:render() end

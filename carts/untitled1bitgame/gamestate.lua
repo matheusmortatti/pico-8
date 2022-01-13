@@ -16,26 +16,6 @@ function gamestate.init()
   multiplier=dget(10)
 
   local str_pos=split(stat(6))
-  -- if #str_pos>=2 then
-  --   local player_pos=v(str_pos[1],str_pos[2])
-  --   level_index=v(flr(player_pos.x/16),flr(player_pos.y/16))
-
-  --   scene_player=player({
-  --     pos=player_pos*8,
-  --     map_pos=player_pos,
-  --   })
-
-  --   e_add(scene_player)
-  -- else
-  --   for i=0,127 do
-  --     for j=0,63 do
-  --       if mget(i,j)==32 then
-  --         level_index=v(flr(i/16),flr(j/16))
-  --       end
-  --     end
-  --   end
-  -- end
-
   for i=0,127 do
     for j=0,63 do
       if mget(i,j)==32 then
@@ -52,6 +32,8 @@ function gamestate.init()
     }
   )
   e_add(cm)
+  wm=worldmap({})
+  e_add(wm)
 
   e_add(fade({
     step=-1,ll=3
